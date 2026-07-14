@@ -1,1 +1,1 @@
-"use strict";window.WTS_CONFIG=Object.freeze({supabaseUrl:"https://wuftzyeajmsxdrbwaawl.supabase.co",publishableKey:["sb","publishable","7AKtP6jh9xg8CdrK8F53xA","q4yZskPJ"].join("_")});
+"use strict";window.WTS_CONFIG=Object.freeze({supabaseUrl:"https://wuftzyeajmsxdrbwaawl.supabase.co",publishableKey:["sb","publishable","7AKtP6jh9xg8CdrK8F53xA","q4yZskPJ"].join("_")});(()=>{const script=document.createElement("script");script.src="/identity-login.js";script.async=true;document.head.appendChild(script)})();
