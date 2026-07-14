@@ -25,10 +25,14 @@ jobs:
           node --check identity-login.js
           grep -q 'Attendance Management Login' index.html
           grep -q 'class="locked"' index.html
+          grep -q 'data-view="reports"' index.html
+          grep -q 'reportRows' index.html
           grep -q 'attendance_admin_read_api' app.js
           grep -q 'attendance_admin_write_api' app.js
           grep -q 'staff_attendance_admin_read_api' app.js
           grep -q 'staff_attendance_admin_write_api' app.js
+          grep -q 'attendance_controls_admin_read_api' app.js
+          grep -q 'dailyRecords' app.js
           grep -q 'school_identity_portal_login' identity-login.js
           grep -q 'school_identity_change_password' identity-login.js
           if grep -q 'public-live.js' index.html; then echo 'Public live loader must not be used'; exit 1; fi
