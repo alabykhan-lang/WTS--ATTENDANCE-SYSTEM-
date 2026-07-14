@@ -17,15 +17,19 @@ jobs:
           test -s styles.css
           test -s config.js
           test -s app.js
+          test -s identity-login.js
           test -s manifest.webmanifest
           test -s vercel.json
           node --check config.js
           node --check app.js
+          node --check identity-login.js
           grep -q 'Attendance Management Login' index.html
           grep -q 'class="locked"' index.html
           grep -q 'attendance_admin_read_api' app.js
           grep -q 'attendance_admin_write_api' app.js
           grep -q 'staff_attendance_admin_read_api' app.js
           grep -q 'staff_attendance_admin_write_api' app.js
+          grep -q 'school_identity_portal_login' identity-login.js
+          grep -q 'school_identity_change_password' identity-login.js
           if grep -q 'public-live.js' index.html; then echo 'Public live loader must not be used'; exit 1; fi
           if grep -RIn -E 'SUPABASE_SERVICE_ROLE_KEY|service_role_key|sb_secret_|x-wts-device-secret' . --exclude-dir=.git; then exit 1; fi
