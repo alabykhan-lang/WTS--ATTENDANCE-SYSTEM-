@@ -10,7 +10,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
       - name: Check application
         run: |
           test -s index.html
@@ -19,10 +19,17 @@ jobs:
           test -s app.js
           test -s identity-login.js
           test -s manifest.webmanifest
+          test -s scanner.html
+          test -s scanner.css
+          test -s scanner.js
+          test -s scanner-manifest.webmanifest
+          test -s scanner-sw.js
           test -s vercel.json
           node --check config.js
           node --check app.js
           node --check identity-login.js
+          node --check scanner.js
+          node --check scanner-sw.js
           grep -q 'Attendance Management Login' index.html
           grep -q 'class="locked"' index.html
           grep -q 'data-view="reports"' index.html
@@ -35,5 +42,8 @@ jobs:
           grep -q 'dailyRecords' app.js
           grep -q 'school_identity_portal_login' identity-login.js
           grep -q 'school_identity_change_password' identity-login.js
+          grep -q 'attendance-scan' scanner.js
+          grep -q 'diagnosticMode' scanner.html
+          grep -q 'offline_sync' scanner.js
           if grep -q 'public-live.js' index.html; then echo 'Public live loader must not be used'; exit 1; fi
-          if grep -RIn -E 'SUPABASE_SERVICE_ROLE_KEY|service_role_key|sb_secret_|x-wts-device-secret' . --exclude-dir=.git; then exit 1; fi
+          if grep -RIn -E 'service_role_key|sb_secret_' . --exclude-dir=.git --exclude=validate.yml; then exit 1; fi

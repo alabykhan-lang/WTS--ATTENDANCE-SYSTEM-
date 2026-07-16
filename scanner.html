@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0b1f3a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>WTS Attendance Scanner</title>
+    <link rel="stylesheet" href="/scanner.css" />
+    <link rel="manifest" href="/scanner-manifest.webmanifest" />
+  </head>
+  <body>
+    <header class="scanner-header">
+      <a class="scanner-brand" href="/" aria-label="WTS Attendance management">
+        <b>WTS</b>
+        <span>Gate Scanner<small>Way to Success Standard Schools</small></span>
+      </a>
+      <div class="network-pill" id="networkPill">
+        <i></i><span>Checking</span>
+      </div>
+    </header>
+
+    <main>
+      <section class="setup-card" id="setupCard">
+        <small class="eyebrow">SCHOOL-OWNED DEVICE SETUP</small>
+        <h1>Connect this scanner</h1>
+        <p>
+          Enter the one-time device details generated from Attendance
+          Management. The secret is never displayed again after registration.
+        </p>
+        <form id="setupForm">
+          <label
+            >Device code<input
+              id="deviceCode"
+              autocomplete="username"
+              maxlength="80"
+              placeholder="WTS-GATE-01"
+              required
+          /></label>
+          <label
+            >Device secret<input
+              id="deviceSecret"
+              type="password"
+              autocomplete="current-password"
+              maxlength="256"
+              required
+          /></label>
+          <label
+            >Scanner source
+            <select id="defaultSource">
+              <option value="qr">Phone camera — QR</option>
+              <option value="nfc">Phone NFC reader</option>
+              <option value="rfid">RFID reader</option>
+              <option value="usb_hid">USB keyboard reader</option>
+              <option value="usb_ccid">USB smart-card reader</option>
+              <option value="standalone_terminal">
+                Standalone gate terminal
+              </option>
+            </select>
+          </label>
+          <label class="check"
+            ><input id="attachLocation" type="checkbox" /><span
+              >Attach phone location when scanning</span
+            ></label
+          >
+          <label class="check"
+            ><input id="rememberSecret" type="checkbox" /><span
+              >Remember the secret on this school-owned phone</span
+            ></label
+          >
+          <p class="security-note">
+            Only remember the secret on a locked phone owned and controlled by
+            the school.
+          </p>
+          <button class="primary wide" type="submit">Connect scanner</button>
+          <div class="form-error" id="setupError"></div>
+        </form>
+      </section>
+
+      <section id="scannerApp" hidden>
+        <div class="device-strip">
+          <div>
+            <small>CONNECTED DEVICE</small
+            ><strong id="connectedDevice">—</strong>
+          </div>
+          <div class="queue-count">
+            <small>OFFLINE QUEUE</small><strong id="queueCount">0</strong>
+          </div>
+          <button class="text-button" id="openSettings" type="button">
+            Settings
+          </button>
+        </div>
+
+        <section class="mode-card">
+          <div class="mode-row" role="group" aria-label="Attendance event type">
+            <button class="mode active" data-event="check_in" type="button">
+              Check in
+            </button>
+            <button class="mode" data-event="check_out" type="button">
+              Check out
+            </button>
+          </div>
+          <label class="test-switch"
+            ><input id="diagnosticMode" type="checkbox" checked /><span
+              ><b>Test only</b
+              ><small>Verify the card without recording attendance</small></span
+            ></label
+          >
+        </section>
+
+        <section class="scan-card">
+          <div class="scan-heading">
+            <div>
+              <small class="eyebrow">READY TO RECEIVE</small>
+              <h1 id="scanTitle">Scan a QR code</h1>
+            </div>
+            <span class="source-badge" id="sourceBadge">QR</span>
+          </div>
+
+          <div class="camera-box" id="cameraBox" hidden>
+            <video id="cameraVideo" playsinline muted></video>
+            <div class="camera-target" aria-hidden="true"></div>
+            <button class="camera-close" id="stopCamera" type="button">
+              Close camera
+            </button>
+          </div>
+
+          <div class="tap-zone" id="tapZone">
+            <div class="scan-icon" id="scanIcon">▣</div>
+            <strong id="tapTitle">Open camera scanner</strong>
+            <span id="tapHelp"
+              >Hold the student or staff QR card inside the frame.</span
+            >
+          </div>
+
+          <button class="primary wide scan-button" id="startScan" type="button">
+            Start QR scanner
+          </button>
+          <div class="divider"><span>OR USE A READER / PASTE TOKEN</span></div>
+          <form class="manual-row" id="manualForm">
+            <input
+              id="credentialInput"
+              autocomplete="off"
+              autocapitalize="off"
+              spellcheck="false"
+              placeholder="Reader input or credential token"
+              minlength="16"
+              maxlength="512"
+              required
+            />
+            <button class="secondary" type="submit">Submit</button>
+          </form>
+        </section>
+
+        <section class="result-card idle" id="resultCard" aria-live="polite">
+          <div class="result-mark" id="resultMark">•</div>
+          <div class="result-copy">
+            <small id="resultCode">WAITING</small>
+            <h2 id="resultName">No scan yet</h2>
+            <p id="resultDetail">The next verified person will appear here.</p>
+          </div>
+        </section>
+
+        <section class="queue-card" id="queueCard">
+          <div>
+            <small class="eyebrow">OFFLINE EVENTS</small>
+            <h2>Pending synchronisation</h2>
+            <p id="queueMessage">No events are waiting.</p>
+          </div>
+          <div class="queue-actions">
+            <button class="secondary" id="syncQueue" type="button">
+              Sync now
+            </button>
+            <button class="text-button danger" id="clearFailed" type="button">
+              Clear failed
+            </button>
+          </div>
+          <div id="queueList"></div>
+        </section>
+      </section>
+    </main>
+
+    <dialog id="settingsDialog">
+      <form method="dialog" class="settings-box">
+        <div class="dialog-head">
+          <div>
+            <small class="eyebrow">SCANNER SETTINGS</small>
+            <h2>Device configuration</h2>
+          </div>
+          <button class="dialog-close" value="cancel" aria-label="Close">
+            ×
+          </button>
+        </div>
+        <label>Scanner source<select id="settingsSource"></select></label>
+        <label class="check"
+          ><input id="settingsLocation" type="checkbox" /><span
+            >Attach phone location</span
+          ></label
+        >
+        <label class="check"
+          ><input id="settingsRemember" type="checkbox" /><span
+            >Remember device secret</span
+          ></label
+        >
+        <div class="setting-meta">
+          <span>Installation ID</span><code id="installationPreview">—</code>
+        </div>
+        <button
+          class="primary wide"
+          id="saveSettings"
+          value="cancel"
+          type="button"
+        >
+          Save settings
+        </button>
+        <button
+          class="danger-button wide"
+          id="forgetDevice"
+          value="cancel"
+          type="button"
+        >
+          Forget this device
+        </button>
+      </form>
+    </dialog>
+
+    <div id="toasts"></div>
+    <script src="/scanner.js"></script>
+  </body>
+</html>
