@@ -15,6 +15,7 @@
 - Verify re-uploading the same checksum is rejected.
 - Verify original event timestamp is retained for imported rows.
 - Verify staff logbook, report calculations and print views contain honest empty states.
+- Verify holiday/closure/staff-only calendar rows are excluded from the pupil denominator and weekly/monthly grouped rows match the selected date range.
 - Verify no browser bundle contains a service-role key or raw device secret.
 - Verify mobile register controls do not require horizontal scrolling.
 
