@@ -16,9 +16,8 @@
       <small>WAY TO SUCCESS STANDARD SCHOOLS, EJIGBO</small>
       <h1>Attendance System</h1>
       <p>Sign in through the central WTS identity to open your authorised Attendance workspace.</p>
-      <label>Staff number, email or administrator code<input id="adminCode" autocomplete="username" required></label>
-      <label>Password or administrator secret<input id="adminSecret" type="password" autocomplete="current-password" required></label>
-      <button class="primary wide" type="submit">Open Attendance</button>
+      <p id="authDescription">Attendance uses the central WTS identity and the approved Attendance module grant. Your Attendance session is separate from other WTS module sessions.</p>
+      <button class="primary wide" id="centralSignIn" type="submit">Continue with central WTS sign-in</button>
       <div class="auth-error" id="authError" role="alert"></div>
       <p class="auth-footnote">Access is checked against the live Central Registry Attendance grant. Attendance does not create a second staff identity.</p>
     </form>
@@ -126,7 +125,8 @@
       <section class="view" id="view-settings">
         <div class="section-head"><div><small class="eyebrow">CONFIGURATION & CONTRACTS</small><h2>Attendance settings</h2><p>Official academic context remains owned by Central Registry.</p></div></div>
         <div class="two-column"><article class="card settings-card"><div class="card-heading"><div><small class="eyebrow">OFFICIAL CONTEXT</small><h2>Current school period</h2></div></div><dl id="contextDetails" class="definition-list"></dl></article><article class="card settings-card"><div class="card-heading"><div><small class="eyebrow">YOUR ACCESS</small><h2>Attendance responsibilities</h2></div></div><div id="roleDetails" class="role-list"></div></article></div>
-        <article class="card contract-card"><div class="card-heading"><div><small class="eyebrow">CROSS-SYSTEM STATUS</small><h2>Central WTS identity and Workspace</h2></div></div><div class="contract-grid"><div><span class="status-icon good">✓</span><b>Central identity grant</b><small>Validated server-side before Attendance access.</small></div><div><span class="status-icon good">✓</span><b>Attendance session</b><small>Short-lived Attendance client session with central logout/revocation.</small></div><div><span class="status-icon pending">↗</span><b>Workspace read-only contract</b><small>Attendance endpoint is ready; Workspace wiring requires coordinated rollout.</small></div><div><span class="status-icon pending">↗</span><b>PKCE Attendance client</b><small>Requires the existing central portal to add an Attendance client/redirect contract.</small></div></div></article>
+        <article class="card settings-card"><div class="card-heading"><div><small class="eyebrow">CENTRAL REGISTRY ROSTER</small><h2>Effective-dated synchronisation</h2></div><button class="ghost" id="retryRosterSync">Run safe re-sync</button></div><div id="rosterSyncDetails" class="definition-list"><div class="empty">Roster synchronisation status will appear when this view opens.</div></div></article>
+        <article class="card contract-card"><div class="card-heading"><div><small class="eyebrow">CROSS-SYSTEM STATUS</small><h2>Central WTS identity and Workspace</h2></div></div><div class="contract-grid"><div><span class="status-icon good">✓</span><b>Central identity grant</b><small>Validated server-side before Attendance access.</small></div><div><span class="status-icon good">✓</span><b>Attendance session</b><small>Short-lived host-only session with central logout and revocation.</small></div><div><span class="status-icon good">✓</span><b>Workspace read-only contract</b><small>Protected Attendance summaries are consumed without attendance-editing controls.</small></div><div><span class="status-icon good">✓</span><b>PKCE Attendance client</b><small>Registered with exact production callback and post-logout targets.</small></div></div></article>
       </section>
     </main>
   </div>
@@ -134,6 +134,7 @@
   <dialog id="secretDialog"><div class="secret-box"><button class="dialog-close" id="closeSecret" aria-label="Close">×</button><div class="auth-logo small-logo">WTS</div><h2 id="secretTitle">One-time credential</h2><p id="secretIntro">Copy or print this now. The raw value is displayed only once.</p><pre id="secretValue"></pre><img id="qrPreview" class="qr-preview" alt="QR code preview" hidden><div class="dialog-actions"><button class="ghost" id="copySecret">Copy value</button><button class="ghost" id="printQrDialog">Print QR</button><button class="primary" id="closeSecretButton">Done</button></div></div></dialog>
   <div id="toasts" aria-live="polite"></div>
   <script src="/config.js"></script>
+  <script src="/identity-login.js"></script>
   <script src="/vendor.bundle.js"></script>
   <script src="/app.js"></script>
 </body>

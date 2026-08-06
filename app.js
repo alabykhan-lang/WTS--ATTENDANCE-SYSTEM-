@@ -1,7 +1,6 @@
 "use strict";
 (() => {
   const CFG = window.WTS_CONFIG;
-  const STORE = "wts_attendance_session";
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => [...document.querySelectorAll(selector)];
   const state = {
@@ -16,6 +15,7 @@
     staffRows: [],
     import: { batchId: null, rows: [], selectedRowId: null, file: null },
     lastQr: null,
+    rosterSync: null,
   };
 
   const esc = (value) => String(value ?? "").replace(/[&<>'"]/g, (char) => ({
@@ -51,21 +51,13 @@
     window.setTimeout(() => node.remove(), 4800);
   }
 
-  function auth() {
-    try {
-      const session = JSON.parse(sessionStorage.getItem(STORE) || "null");
-      if (session?.code && session?.secret) return session;
-    } catch {}
-    throw new Error("Central Attendance access is required.");
-  }
-
   async function rpc(name, action, payload = {}) {
-    const session = auth();
-    const response = await fetch(`${CFG.supabaseUrl}/rest/v1/rpc/${name}`, {
+    const response = await fetch("/api/rpc", {
       method: "POST",
       cache: "no-store",
-      headers: { "Content-Type": "application/json", apikey: CFG.publishableKey },
-      body: JSON.stringify({ p_client_code: session.code, p_client_secret: session.secret, p_action: action, p_payload: payload }),
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ name, action, payload }),
     });
     let data;
     try { data = await response.json(); } catch { throw new Error("Invalid Attendance server response."); }
@@ -95,14 +87,13 @@
     if ($("#authError")) $("#authError").textContent = message;
   }
 
-  function signOut() {
-    sessionStorage.removeItem(STORE);
+  async function signOut() {
+    await fetch("/api/sso-logout", { method: "POST", credentials: "same-origin", headers: { Accept: "application/json" }, cache: "no-store" }).catch(() => {});
     state.connected = false;
     state.context = null;
     state.summary = null;
     connected(false);
-    $("#adminSecret").value = "";
-    $("#adminCode").focus();
+    window.location.assign(CFG.postLogoutUri);
   }
 
   function setOptions(selector, options, placeholder = "") {
@@ -180,10 +171,10 @@
       if (viewName === "imports") await loadImports();
       if (viewName === "corrections") await loadCorrections();
       if (viewName === "reports") await runReport();
-      if (viewName === "settings") renderSettings();
+      if (viewName === "settings") await renderSettings();
     } catch (error) {
       toast(error.message, "error");
-      if (["ADMIN_AUTH_FAILED", "ADMIN_SESSION_EXPIRED", "ADMIN_PERMISSION_DENIED"].includes(error.code)) signOut();
+      if (["ADMIN_AUTH_FAILED", "ADMIN_SESSION_EXPIRED", "ADMIN_PERMISSION_DENIED", "RESULT_SESSION_NOT_ACTIVE", "RESULT_SESSION_REQUIRED", "ATTENDANCE_SESSION_REQUIRED", "CENTRAL_IDENTITY_NOT_ACTIVE"].includes(error.code)) void signOut();
     }
   }
 
@@ -562,11 +553,28 @@
     }
   }
 
-  function renderSettings() {
+  async function renderSettings() {
     const config = state.context?.config || {};
     $("#contextDetails").innerHTML = `<div><dt>Academic session</dt><dd>${esc(state.context?.session || config.operational_session || "—")}</dd></div><div><dt>Academic term</dt><dd>${esc(state.context?.term || config.operational_term || "—")}</dd></div><div><dt>Configuration source</dt><dd>Central Registry promotion context</dd></div><div><dt>Enabled modalities</dt><dd>${esc((config.enabled_modalities || []).join(", ") || "Manual / QR / card ready")}</dd></div><div><dt>Automatic absence</dt><dd>${config.automatic_absence_enabled ? "Enabled by policy" : "Not enabled"}</dd></div><div><dt>Parent notifications</dt><dd>${config.parent_notifications_enabled ? "Enabled by approved contract" : "Not enabled"}</dd></div>`;
     const permissions = state.context?.permissions || [];
     $("#roleDetails").innerHTML = permissions.length ? permissions.map((item) => `<span class="permission-chip">${esc(item)}</span>`).join("") : `<div class="empty">No Attendance actions were granted.</div>`;
+    await loadRosterSyncStatus();
+  }
+
+  async function loadRosterSyncStatus() {
+    const data = await rpc("attendance_roster_sync_status_api");
+    state.rosterSync = data;
+    const latest = data.latest_success && data.latest_success !== "null" ? data.latest_success : null;
+    const completed = latest?.completed_at ? displayDate(latest.completed_at) : "Not available";
+    $("#rosterSyncDetails").innerHTML = latest ? `<div><dt>Last successful sync</dt><dd>${esc(completed)}</dd></div><div><dt>Context</dt><dd>${esc(`${latest.academic_session || "—"} · ${latest.academic_term || "—"}`)}</dd></div><div><dt>Records added / updated</dt><dd>${numberValue(latest.records_added)} / ${numberValue(latest.records_updated)}</dd></div><div><dt>Deactivated for future rosters</dt><dd>${numberValue(latest.records_deactivated)}</dd></div><div><dt>Unresolved identities</dt><dd>${numberValue(latest.unresolved_identities)}</dd></div><div><dt>Failed mappings</dt><dd>${numberValue(latest.failed_mappings)}</dd></div>` : `<div class="empty">No successful roster synchronisation is recorded yet.</div>`;
+    $("#retryRosterSync").disabled = !(data.retry_available && globalScope());
+  }
+
+  async function retryRosterSync() {
+    if (!globalScope()) return toast("Roster synchronisation requires an authorised Attendance administrator.", "error");
+    await rpc("attendance_roster_sync_api", "", { academic_session: state.context?.session, academic_term: state.context?.term, as_of_date: todayIso() });
+    await loadRosterSyncStatus();
+    toast("Central Registry roster re-synchronised safely.", "success");
   }
 
   async function showSecret(title, value, makeQr = false) {
@@ -638,6 +646,7 @@
     $("#refreshImports").onclick = () => loadImports().catch((error) => toast(error.message, "error"));
     $("#refreshCorrections").onclick = () => loadCorrections().catch((error) => toast(error.message, "error"));
     $("#runReport").onclick = () => runReport().catch((error) => toast(error.message, "error"));
+    $("#retryRosterSync").onclick = () => retryRosterSync().catch((error) => toast(error.message, "error"));
     $("#printReport").onclick = () => printArea("print-report");
     $("#closeSecret").onclick = () => $("#secretDialog").close();
     $("#closeSecretButton").onclick = () => $("#secretDialog").close();
@@ -658,15 +667,13 @@
     await loadOverview();
   }
 
-  $("#gateForm").onsubmit = async (event) => {
-    event.preventDefault();
-    $("#authError").textContent = "Checking central Attendance access…";
-    sessionStorage.setItem(STORE, JSON.stringify({ code: $("#adminCode").value.trim(), secret: $("#adminSecret").value }));
-    try { await loadContext(); $("#authError").textContent = ""; toast("Attendance workspace opened.", "success"); }
-    catch (error) { sessionStorage.removeItem(STORE); connected(false, error.message); $("#adminSecret").value = ""; }
-  };
-
   wireEvents();
   connected(false);
-  try { const existing = auth(); $("#adminCode").value = existing.code; loadContext().catch(() => signOut()); } catch { $("#adminCode").focus(); }
+  Promise.resolve(window.WTS_AUTH_READY).then((authenticated) => {
+    if (!authenticated) return;
+    return loadContext().catch((error) => {
+      connected(false, error.message || "Attendance access could not be loaded.");
+      if (["RESULT_SESSION_NOT_ACTIVE", "RESULT_SESSION_REQUIRED", "ATTENDANCE_SESSION_REQUIRED", "CENTRAL_IDENTITY_NOT_ACTIVE"].includes(error.code)) void signOut();
+    });
+  });
 })();
