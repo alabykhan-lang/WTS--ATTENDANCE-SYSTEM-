@@ -37,7 +37,7 @@
               id="deviceCode"
               autocomplete="username"
               maxlength="80"
-              placeholder="WTS-GATE-01"
+              placeholder="Enter the registered device code"
               required
           /></label>
           <label
@@ -104,9 +104,9 @@
             </button>
           </div>
           <label class="test-switch"
-            ><input id="diagnosticMode" type="checkbox" checked /><span
-              ><b>Test only</b
-              ><small>Verify the card without recording attendance</small></span
+            ><input id="diagnosticMode" type="checkbox" /><span
+              ><b>Verify only</b
+              ><small>Turn on only when checking a credential without recording attendance</small></span
             ></label
           >
         </section>
@@ -147,7 +147,7 @@
               autocapitalize="off"
               spellcheck="false"
               placeholder="Reader input or credential token"
-              minlength="16"
+              minlength="1"
               maxlength="512"
               required
             />

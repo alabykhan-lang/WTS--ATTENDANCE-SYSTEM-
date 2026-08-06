@@ -4,7 +4,12 @@ import { createClient } from "@supabase/supabase-js";
 const SOURCES = new Set([
   "qr",
   "nfc",
+  "mifare",
   "rfid",
+  "card",
+  "fingerprint",
+  "face",
+  "pin",
   "usb_hid",
   "usb_ccid",
   "standalone_terminal",
@@ -149,7 +154,11 @@ Deno.serve(async (request: Request) => {
   const note =
     typeof body.note === "string" ? body.note.trim().slice(0, 500) : null;
 
-  if (!credential || credential.length < 16)
+  if (
+    !credential ||
+    credential.length > 512 ||
+    (source === "qr" && credential.length < 8)
+  )
     return reply(request, { ok: false, code: "INVALID_CREDENTIAL" }, 400);
   if (!eventId || !UUID_RE.test(eventId))
     return reply(request, { ok: false, code: "INVALID_CLIENT_EVENT_ID" }, 400);
@@ -232,7 +241,7 @@ Deno.serve(async (request: Request) => {
   const tokenHash = await sha256(credential);
   const rpcName = diagnostic
     ? "diagnose_attendance_credential"
-    : "process_attendance_scan_secure";
+    : "attendance_universal_intake";
   // Browser scanners cannot provide trustworthy native-device attestation. Devices
   // with integrity_required must use a future attested native scanner instead.
   const rpcArgs = diagnostic
@@ -250,11 +259,17 @@ Deno.serve(async (request: Request) => {
         p_client_event_id: eventId,
         p_event_type: eventType,
         p_source: source,
+        p_event_time: source === "offline_sync" ? localRecordedAt : null,
         p_local_recorded_at: localRecordedAt,
+        p_source_event_id: eventId,
         p_note: note,
-        p_latitude: latitude,
-        p_longitude: longitude,
-        p_integrity_ok: false,
+        p_metadata: {
+          credential_method: source,
+          source_time_zone: "Africa/Lagos",
+          latitude,
+          longitude,
+          location_accuracy_metres: accuracy,
+        },
       };
 
   const { data, error } = await db.rpc(rpcName, rpcArgs);

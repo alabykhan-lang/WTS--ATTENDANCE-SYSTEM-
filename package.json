@@ -1,0 +1,17 @@
+{
+  "name": "wts-attendance-system",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check": "node scripts/check.mjs",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "dependencies": {
+    "qrcode": "1.5.4",
+    "xlsx": "0.18.5"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.1"
+  }
+}

@@ -4,15 +4,16 @@ Standalone student and staff attendance control system for Way to Success Standa
 
 Production release includes:
 
-- student attendance dashboard;
-- staff attendance dashboard;
-- QR, NFC and RFID credentials;
-- school-owned phone scanners and external readers;
-- attendance-device monitoring;
-- a dedicated installable phone scanner at `/scanner`;
-- QR camera, Web NFC and USB/RFID reader input;
-- test-only credential verification before recording;
-- encrypted offline event queue and automatic synchronisation;
-- shared WTS Supabase database.
+- Central WTS identity and Attendance module-grant validation;
+- AM/PM student registers generated from real Central Registry classes;
+- staff daily logbook linked to real Central Registry staff profiles;
+- manual, QR, NFC/MIFARE/RFID, external device-user and generic card credentials;
+- secure QR issuance and browser scanner at `/scanner`;
+- generic CSV, XLSX and delimited-text Import Centre with preview, checksum and unresolved-user review;
+- device registry, offline-safe event intake, deduplication and raw-event audit;
+- corrections, register locking, reports and print-safe operational views;
+- a protected read-only Workspace contract and Notification-ready outbox hooks.
 
-Release refreshed for the dedicated Vercel project on 12 July 2026.
+The system is hardware-independent: manual and QR operation are available before a terminal is purchased, while future terminals connect through the universal event and adapter contracts. No sample pupils, staff, devices or attendance facts are created by the application.
+
+See `docs/` for the architecture, credential lifecycle, device integration, calculations, security controls and production verification runbook.

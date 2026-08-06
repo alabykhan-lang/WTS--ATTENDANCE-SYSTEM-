@@ -374,13 +374,13 @@
 
   async function submitCredential(raw) {
     const credential = String(raw || "").trim();
-    if (credential.length < 16)
+    if (!credential.length)
       return (
         showResult(
           "error",
           "INVALID CREDENTIAL",
           "Card not accepted",
-          "The scanned value is too short.",
+          "The reader returned an empty value.",
         ),
         beep(false)
       );
@@ -718,7 +718,7 @@
     });
     $("#setupError").textContent = "";
     openScanner();
-    toast("Scanner connected. Run a test-only scan first.", "success");
+    toast("Scanner connected. It is ready for server-confirmed attendance.", "success");
   };
   $$("[data-event]").forEach(
     (button) =>

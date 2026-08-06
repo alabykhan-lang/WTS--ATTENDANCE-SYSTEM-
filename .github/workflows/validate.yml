@@ -25,21 +25,27 @@ jobs:
           test -s scanner-manifest.webmanifest
           test -s scanner-sw.js
           test -s vercel.json
+          test -s package.json
+          test -s package-lock.json
+          test -s vendor.bundle.js
+          test -s supabase/migrations/20260806143000_universal_attendance_organizer.sql
+          test -s docs/ATTENDANCE-SYSTEM-ARCHITECTURE.md
+          npm ci --ignore-scripts
+          npm run check
+          npm run build
+          npm test
           node --check config.js
           node --check app.js
           node --check identity-login.js
           node --check scanner.js
           node --check scanner-sw.js
-          grep -q 'Attendance Management Login' index.html
+          grep -q 'Attendance System' index.html
           grep -q 'class="locked"' index.html
           grep -q 'data-view="reports"' index.html
-          grep -q 'reportRows' index.html
-          grep -q 'attendance_admin_read_api' app.js
-          grep -q 'attendance_admin_write_api' app.js
-          grep -q 'staff_attendance_admin_read_api' app.js
-          grep -q 'staff_attendance_admin_write_api' app.js
-          grep -q 'attendance_controls_admin_read_api' app.js
-          grep -q 'dailyRecords' app.js
+          grep -q 'attendance_universal_admin_read_api' app.js
+          grep -q 'attendance_universal_admin_write_api' app.js
+          grep -q 'attendance_controls_admin_write_api' app.js
+          grep -q 'attendance_universal_intake' supabase/functions/attendance-scan/index.ts
           grep -q 'school_identity_portal_login' identity-login.js
           grep -q 'school_identity_change_password' identity-login.js
           grep -q 'attendance-scan' scanner.js
