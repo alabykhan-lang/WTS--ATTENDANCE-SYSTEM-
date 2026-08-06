@@ -2,6 +2,7 @@
 
 - Central WTS identity and server-side Attendance module grant validation.
 - Short-lived Attendance admin sessions with expiry checks and revocation via the central logout path.
+- Current browser session transport is short-lived and grant-validated; dedicated Attendance PKCE callback registration and the final host-only HttpOnly cookie session require the coordinated Central Registry/Workspace contract.
 - Server-side effective Attendance permissions and class-allocation checks for protected actions.
 - RLS enabled on Attendance-owned tables; direct browser table access revoked. Security-definer APIs validate their own credentials and have explicit execution grants.
 - Device-specific secret hashes, device status checks, source allowlists, installation binding and rate/origin controls at the Edge Function.

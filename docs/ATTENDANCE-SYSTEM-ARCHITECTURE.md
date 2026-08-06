@@ -22,7 +22,7 @@ The production database now includes:
 
 ## Access boundary
 
-The browser holds only the short-lived Attendance admin client session returned by the existing central identity flow. New read/write APIs validate the client secret, session expiry, effective Attendance permissions and, for class operations, the live class allocation. Raw credential values, device secrets and biometric templates are never returned by read APIs.
+The browser currently holds only the short-lived Attendance admin client session returned by the existing central identity flow. New read/write APIs validate the client secret, session expiry, effective Attendance permissions and, for class operations, the live class allocation. The final dedicated Attendance PKCE callback and host-only HttpOnly cookie transport remain a coordinated Central Registry/Workspace dependency; Attendance does not create a second password system. Raw credential values, device secrets and biometric templates are never returned by read APIs.
 
 The live scanner uses a device code and one-way device-secret hash at the Edge Function boundary. Devices never receive a Supabase service key.
 
