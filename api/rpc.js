@@ -23,12 +23,13 @@ const OPERATOR_RPCS = new Set([
 ]);
 
 // Supabase REST workers can briefly retain different schema-cache generations after
-// an additive RPC is created. These established Attendance names are kept as
-// compatibility entry points; their database bodies delegate to the universal
-// contracts without changing authorization or payload semantics.
+// an additive RPC is created. Keep both the established and universal Attendance
+// names available; the shared adapter retries a 404 before trying the alternate.
 const RPC_COMPATIBILITY_ALIASES = Object.freeze({
-  attendance_universal_admin_read_api: "attendance_admin_read_api",
-  attendance_universal_admin_write_api: "attendance_admin_write_api",
+  attendance_universal_admin_read_api: ["attendance_admin_read_api", "attendance_universal_admin_read_api"],
+  attendance_universal_admin_write_api: ["attendance_admin_write_api", "attendance_universal_admin_write_api"],
+  attendance_admin_read_api: ["attendance_admin_read_api", "attendance_universal_admin_read_api"],
+  attendance_admin_write_api: ["attendance_admin_write_api", "attendance_universal_admin_write_api"],
 });
 
 export default async function handler(req, res) {
