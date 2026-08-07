@@ -22,6 +22,15 @@ const OPERATOR_RPCS = new Set([
   "attendance_controls_admin_write_api",
 ]);
 
+// Supabase REST workers can briefly retain different schema-cache generations after
+// an additive RPC is created. These established Attendance names are kept as
+// compatibility entry points; their database bodies delegate to the universal
+// contracts without changing authorization or payload semantics.
+const RPC_COMPATIBILITY_ALIASES = Object.freeze({
+  attendance_universal_admin_read_api: "attendance_admin_read_api",
+  attendance_universal_admin_write_api: "attendance_admin_write_api",
+});
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return sendJson(res, { ok: false, code: "METHOD_NOT_ALLOWED" }, 405);
   if (!sameOrigin(req)) return sendJson(res, { ok: false, code: "ORIGIN_NOT_ALLOWED" }, 403);
@@ -36,7 +45,8 @@ export default async function handler(req, res) {
   let result;
   if (OPERATOR_RPCS.has(name)) {
     if (!action || action.length > 120) return sendJson(res, { ok: false, code: "ATTENDANCE_ACTION_REQUIRED" }, 400);
-    result = await supabaseRpc(name, { p_client_code: local.code, p_client_secret: local.secret, p_action: action, p_payload: payload });
+    const rpcName = RPC_COMPATIBILITY_ALIASES[name] || name;
+    result = await supabaseRpc(rpcName, { p_client_code: local.code, p_client_secret: local.secret, p_action: action, p_payload: payload });
   } else if (name === "attendance_roster_sync_status_api") {
     result = await supabaseRpc(name, { p_session_id: central.session.sessionId, p_session_secret: central.session.sessionSecret });
   } else if (name === "attendance_roster_sync_api") {
