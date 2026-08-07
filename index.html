@@ -7,6 +7,7 @@
   <meta name="description" content="WTS Attendance System — manual, QR, card and device-independent school attendance.">
   <title>WTS Attendance System</title>
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/auth.css">
   <link rel="manifest" href="/manifest.webmanifest">
 </head>
 <body class="locked">
@@ -15,11 +16,14 @@
       <div class="auth-logo">WTS</div>
       <small>WAY TO SUCCESS STANDARD SCHOOLS, EJIGBO</small>
       <h1>Attendance System</h1>
-      <p>Sign in through the central WTS identity to open your authorised Attendance workspace.</p>
-      <p id="authDescription">Attendance uses the central WTS identity and the approved Attendance module grant. Your Attendance session is separate from other WTS module sessions.</p>
-      <button class="primary wide" id="centralSignIn" type="submit">Continue with central WTS sign-in</button>
+      <p>Sign in with the same WTS staff credentials used for Central Registry and Workspace.</p>
+      <p id="authDescription">Central Registry remains the only identity and password authority. Attendance checks your existing identity and Attendance grant, then creates its own secure Attendance session.</p>
+      <label>Staff number or official email<input id="loginId" autocomplete="username" autocapitalize="none" required></label>
+      <label>Password<div class="password-input-wrap"><input id="loginPassword" type="password" autocomplete="current-password" required><button class="password-toggle" id="passwordToggle" type="button">Show password</button></div></label>
+      <button class="primary wide" id="attendanceSignIn" type="submit">Sign in to Attendance</button>
+      <button class="ghost wide auth-secondary" id="workspaceSignIn" type="button">Use an active WTS Workspace session</button>
       <div class="auth-error" id="authError" role="alert"></div>
-      <p class="auth-footnote">Access is checked against the live Central Registry Attendance grant. Attendance does not create a second staff identity.</p>
+      <p class="auth-footnote">No separate Attendance email, password or staff identity is created.</p>
     </form>
   </section>
 
@@ -132,6 +136,7 @@
   </div>
 
   <dialog id="secretDialog"><div class="secret-box"><button class="dialog-close" id="closeSecret" aria-label="Close">×</button><div class="auth-logo small-logo">WTS</div><h2 id="secretTitle">One-time credential</h2><p id="secretIntro">Copy or print this now. The raw value is displayed only once.</p><pre id="secretValue"></pre><img id="qrPreview" class="qr-preview" alt="QR code preview" hidden><div class="dialog-actions"><button class="ghost" id="copySecret">Copy value</button><button class="ghost" id="printQrDialog">Print QR</button><button class="primary" id="closeSecretButton">Done</button></div></div></dialog>
+  <dialog id="requiredPasswordDialog"><form method="dialog" id="requiredPasswordForm" class="auth-card password-dialog"><h2>Create your WTS password</h2><p>Your Central Registry account requires a password change before Attendance can open.</p><label>New password<div class="password-input-wrap"><input id="requiredPassword" type="password" autocomplete="new-password" minlength="10" maxlength="512" required><button class="password-toggle" type="button" data-password-toggle="requiredPassword">Show password</button></div></label><label>Confirm password<div class="password-input-wrap"><input id="requiredPasswordConfirm" type="password" autocomplete="new-password" minlength="10" maxlength="512" required><button class="password-toggle" type="button" data-password-toggle="requiredPasswordConfirm">Show password</button></div></label><div class="auth-error" id="requiredPasswordError" role="alert"></div><div class="dialog-actions"><button type="button" class="ghost" id="requiredPasswordCancel">Cancel</button><button class="primary" value="default">Save password</button></div></form></dialog>
   <div id="toasts" aria-live="polite"></div>
   <script src="/config.js"></script>
   <script src="/identity-login.js"></script>
