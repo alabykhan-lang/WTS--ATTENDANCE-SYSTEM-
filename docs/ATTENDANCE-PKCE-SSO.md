@@ -15,9 +15,15 @@ Attendance is an approved WTS SSO client. Central Registry remains the identity 
 
 Central Registry stores the active registration and validates the exact client, audience and redirect tuple. Authorization codes are short-lived and single-use. The authorization request binds state and nonce hashes, and the exchange checks the state, nonce and S256 verifier again.
 
-## Flow
+## Direct Attendance sign-in
 
-1. Attendance creates an ephemeral verifier, state and nonce in browser session storage.
+Attendance also keeps its own normal sign-in screen for direct visits. The screen accepts the existing WTS staff number or official email and the existing WTS password. The Attendance server sends those credentials only to the Central Registry `school_identity_portal_login` contract with the `attendance` application code. Central Registry remains responsible for password verification, lockout, active identity, employment and Attendance-grant checks. Attendance then issues its own host-only session; it never creates a second identity or stores a second password.
+
+The direct form is the normal fallback for a direct Attendance visit. It is not an independent Attendance account system.
+
+## PKCE flow
+
+1. When the user chooses the existing Workspace session, Attendance creates an ephemeral verifier, state and nonce in browser session storage.
 2. The browser goes to the School Platform authorization endpoint.
 3. The School Platform requires an active Workspace session and asks Central Registry to issue an Attendance-specific code.
 4. Central Registry redirects to the exact Attendance callback.
