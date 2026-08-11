@@ -243,6 +243,11 @@
     try {
       const callbackHandled = await exchangeCallback();
       if (callbackHandled || await checkSession()) return true;
+      const query = new URLSearchParams(window.location.search);
+      if (query.get("sso") === "1") {
+        await beginLogin();
+        return true;
+      }
     } catch (error) {
       setMessage(error.message || friendly(error.code), "error");
       return false;
