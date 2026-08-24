@@ -246,7 +246,11 @@
       const query = new URLSearchParams(window.location.search);
       if (query.get("sso") === "1") {
         await beginLogin();
-        return true;
+        // The authorization redirect has only been scheduled at this point;
+        // Attendance does not have its host-only session cookies yet. Keep the
+        // main application locked so it cannot race the navigation with an
+        // unauthenticated RPC and send the user back to the Workspace.
+        return false;
       }
     } catch (error) {
       setMessage(error.message || friendly(error.code), "error");

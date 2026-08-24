@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 
 function normalizeIdentifier(raw, type = "generic_card_uid") {
   const value = String(raw ?? "").trim();
@@ -36,4 +37,13 @@ test("missing register rows are incomplete, not present", () => {
   const incomplete = statuses.filter((status) => status === "incomplete").length;
   assert.equal(actual, 2);
   assert.equal(incomplete, 1);
+});
+
+test("portal SSO launch keeps the Attendance app locked until callback exchange", async () => {
+  const source = await readFile(new URL("../identity-login.js", import.meta.url), "utf8");
+  const portalLaunch = source.match(/if \(query\.get\("sso"\) === "1"\) \{([\s\S]*?)\n\s*\}/)?.[1] || "";
+
+  assert.match(portalLaunch, /await beginLogin\(\)/);
+  assert.match(portalLaunch, /return false/);
+  assert.doesNotMatch(portalLaunch, /return true/);
 });
