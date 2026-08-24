@@ -11,10 +11,9 @@
     students: [],
     staff: [],
     selectedPerson: null,
-    register: { students: [], date: "", classKey: "", slot: "morning", lock: {} },
-    staffRows: [],
     import: { batchId: null, rows: [], selectedRowId: null, file: null },
     lastQr: null,
+    lastQrPersonId: null,
     rosterSync: null,
   };
 
@@ -24,6 +23,8 @@
   const text = (value, fallback = "—") => value === null || value === undefined || value === "" ? fallback : String(value);
   const cleanStatus = (value) => String(value || "incomplete").replaceAll("_", " ");
   const statusClass = (value) => String(value || "incomplete").toLowerCase().replace(/[^a-z0-9-]/g, "-");
+  const personPhoto = (person) => person?.photo || person?.photo_url || person?.profile_photo_url || person?.avatar_url || "";
+  const avatarMarkup = (person, fallback = "W") => personPhoto(person) ? `<img src="${esc(personPhoto(person))}" alt="">` : esc((person?.displayName || fallback).slice(0, 1).toUpperCase());
   const dateInput = (value) => value ? String(value).slice(0, 10) : "";
   const displayDate = (value) => {
     if (!value) return "—";
@@ -74,7 +75,6 @@
   const studentRead = (action, payload = {}) => rpc("attendance_admin_read_api", action, payload);
   const studentWrite = (action, payload = {}) => rpc("attendance_admin_write_api", action, payload);
   const staffRead = (action, payload = {}) => rpc("staff_attendance_admin_read_api", action, payload);
-  const controlsRead = (action, payload = {}) => rpc("attendance_controls_admin_read_api", action, payload);
   const controlsWrite = (action, payload = {}) => rpc("attendance_controls_admin_write_api", action, payload);
 
   function connected(value, message = "") {
@@ -112,17 +112,12 @@
 
   function fillClassSelectors() {
     const options = contextClasses();
-    setOptions("#registerClass", options, "Choose class");
     setOptions("#reportClass", options, globalScope() ? "All classes" : "Choose class");
-    if (!$("#registerClass").value && options[0]) $("#registerClass").value = options[0].value;
-    if (!globalScope() && !$("#reportClass").value && options[0]) $("#reportClass").value = options[0].value;
+    if (!globalScope() && !$("#reportClass")?.value && options[0]) $("#reportClass").value = options[0].value;
   }
 
   function applyNavigation() {
     const gated = {
-      register: permission("class.attendance.read") || permission("class.attendance.write") || permission("manual_entries.create"),
-      staff: permission("staff.read") || permission("personal.attendance.read"),
-      manual: permission("class.attendance.write") || permission("manual_entries.create"),
       credentials: permission("credentials.manage"),
       devices: permission("devices.read") || permission("devices.manage"),
       imports: permission("imports.read") || permission("imports.manage"),
@@ -138,17 +133,14 @@
 
   function setTitle(viewName) {
     const titles = {
-      overview: ["Attendance Overview", "One honest view of today’s school attendance."],
-      register: ["Student Register", "Morning and afternoon records remain separate."],
-      staff: ["Staff Logbook", "Arrival, departure and authorised exceptions."],
-      manual: ["Manual Marking", "A supported input method with an audit trail."],
-      scan: ["Scan / Live Events", "Server-confirmed capture from QR, cards and adapters."],
-      credentials: ["Credentials", "Flexible identifiers linked to Central Registry people."],
-      devices: ["Devices & Adapters", "Register only real hardware and approved sources."],
-      imports: ["Import Centre", "Preview, resolve and process terminal exports safely."],
-      corrections: ["Corrections", "Review requests without deleting original events."],
+      overview: ["Today", "A clear view of attendance as it happens."],
+      scan: ["Scan", "One secure scanner for QR passes and NFC cards."],
+      credentials: ["ID Cards", "Issue QR passes and link NFC cards from the central office."],
+      devices: ["Device Setup", "Register only school-owned QR and NFC equipment."],
+      imports: ["Sync", "Real-time, offline retry, and device-file imports."],
+      corrections: ["Exceptions", "Review unusual cases without changing original events."],
       reports: ["Attendance Reports", "Daily, weekly, monthly, term and session views."],
-      settings: ["Attendance Settings", "Roles, schedule context and protected contracts."],
+      settings: ["Access & Context", "Central Registry identity, roles and school period."],
     };
     const [title, subtitle] = titles[viewName] || titles.overview;
     $("#title").textContent = title;
@@ -163,9 +155,6 @@
     setTitle(viewName);
     try {
       if (viewName === "overview") await loadOverview();
-      if (viewName === "register") await loadRegister();
-      if (viewName === "staff") await loadStaffLogbook();
-      if (viewName === "manual") await loadManualPeople();
       if (viewName === "credentials") await loadCredentialPeople();
       if (viewName === "devices") await loadDevices();
       if (viewName === "imports") await loadImports();
@@ -180,10 +169,6 @@
 
   function numberValue(value) {
     return Number.isFinite(Number(value)) ? Number(value) : 0;
-  }
-
-  function summaryPart(summary, key) {
-    return summary?.[key] ?? summary?.student?.[key] ?? 0;
   }
 
   function renderEvents(target, events = []) {
@@ -214,82 +199,12 @@
     const classRows = student.class_summary || student.classes || [];
     $("#classSummary").innerHTML = classRows.length ? classRows.map((item) => `<div class="class-row"><div><strong>${esc(item.class_key || item.class || "Class")}</strong><small>${numberValue(item.expected)} expected · ${numberValue(item.waiting)} unconfirmed</small></div><div class="class-progress"><span style="width:${Math.min(100, numberValue(item.expected) ? ((numberValue(item.present) + numberValue(item.late)) / numberValue(item.expected)) * 100 : 0)}%"></span></div><b>${numberValue(item.present) + numberValue(item.late)}/${numberValue(item.expected)}</b></div>`).join("") : `<div class="empty">No active class placements are available.</div>`;
     const attention = [];
-    if (numberValue(student.waiting) > 0) attention.push(["Incomplete student registers", `${student.waiting} expected records are still waiting for confirmation.`, "register"]);
-    if (numberValue(staff.waiting) > 0) attention.push(["Staff records need review", `${staff.waiting} staff records are not yet resolved for today.`, "staff"]);
+    if (numberValue(student.waiting) > 0) attention.push(["Student sessions need review", `${student.waiting} expected records are still unresolved.`, "corrections"]);
+    if (numberValue(staff.waiting) > 0) attention.push(["Staff events need review", `${staff.waiting} staff records are still unresolved.`, "corrections"]);
     if (!attention.length) attention.push(["No open attention items", "Confirmed data will appear here as the school records attendance.", "reports"]);
     $("#attentionList").innerHTML = attention.map(([title, copy, viewName]) => `<button class="attention-item" data-go="${viewName}"><span class="attention-icon">!</span><span><b>${esc(title)}</b><small>${esc(copy)}</small></span><span>→</span></button>`).join("");
     const importCount = (imports.batches || []).length;
-    $("#healthList").innerHTML = `<div class="health-item"><span class="health-check ${state.devices.length ? "good" : "muted"}">${state.devices.length ? "✓" : "–"}</span><div><b>${state.devices.length ? `${state.devices.length} registered device${state.devices.length === 1 ? "" : "s"}` : "No physical devices registered"}</b><small>${state.devices.length ? "Health status comes from the live Device Registry." : "Manual and QR workflows remain available."}</small></div></div><div class="health-item"><span class="health-check ${importCount ? "good" : "muted"}">${importCount ? "✓" : "–"}</span><div><b>${importCount ? `${importCount} import batch${importCount === 1 ? "" : "es"}` : "No imports yet"}</b><small>Imports are previewed and checksum-protected.</small></div></div>`;
-  }
-
-  function renderRegister() {
-    const list = $("#registerList");
-    const query = $("#registerSearch").value.trim().toLowerCase();
-    const rows = state.register.students.filter((student) => !query || `${student.name} ${student.admno || ""}`.toLowerCase().includes(query));
-    $("#registerCount").textContent = `${state.register.students.length} pupil${state.register.students.length === 1 ? "" : "s"}`;
-    $("#registerHelp").textContent = state.register.lock?.status && state.register.lock.status !== "open" ? `Register is ${cleanStatus(state.register.lock.status)}.` : "Mark all present, then adjust exceptions.";
-    $("#registerState").innerHTML = state.register.classKey ? `<span class="pill ${statusClass(state.register.lock?.status || "open")}">${esc(cleanStatus(state.register.lock?.status || "open"))}</span><span>${esc(state.register.classKey)} · ${displayDate(state.register.date)} · ${esc(state.register.slot)}</span>` : "";
-    $("#registerEmpty").style.display = rows.length ? "none" : "block";
-    list.innerHTML = rows.map((student) => `<div class="register-row ${student.id === state.register.selectedId ? "selected" : ""}" data-register-id="${esc(student.id)}"><div class="pupil-avatar">${esc((student.name || "P").slice(0, 1).toUpperCase())}</div><div class="person-copy"><strong>${esc(student.name)}</strong><small>${esc(student.admno || "No admission number")} · ${esc(student.class_key || state.register.classKey)}</small></div><div class="status-options">${["present", "absent", "late", "excused"].map((status) => `<button class="status-choice ${student.status === status ? `chosen ${statusClass(status)}` : ""}" data-status="${status}" title="${status}">${status === "present" ? "P" : status === "absent" ? "A" : status === "late" ? "L" : "E"}</button>`).join("")}<select class="status-select" data-status-select aria-label="More statuses"><option value="">More</option>${["official_activity", "sick_leave", "early_departure", "half_day", "school_activity", "not_expected", "school_closed", "incomplete"].map((status) => `<option value="${status}" ${student.status === status ? "selected" : ""}>${esc(cleanStatus(status))}</option>`).join("")}</select></div><button class="row-action" data-select-correction="${esc(student.id)}" title="Select for correction">⋯</button></div>`).join("");
-  }
-
-  async function loadRegister() {
-    if (!$("#registerClass").value) fillClassSelectors();
-    state.register.date = $("#registerDate").value || todayIso();
-    state.register.classKey = $("#registerClass").value;
-    state.register.slot = $("#registerSlot").value || "morning";
-    if (!state.register.classKey) { renderRegister(); return; }
-    const data = await universalRead("register", { date: state.register.date, classKey: state.register.classKey, sessionSlot: state.register.slot });
-    state.register.students = data.students || [];
-    state.register.lock = data.lock || {};
-    state.register.classKey = data.class_key || state.register.classKey;
-    renderRegister();
-  }
-
-  async function saveRegister() {
-    if (!state.register.students.length) return toast("Load an expected class register first.", "error");
-    const data = await universalWrite("saveRegister", { date: state.register.date, classKey: state.register.classKey, sessionSlot: state.register.slot, rows: state.register.students.map((student) => ({ studentId: student.id, status: student.status || "incomplete", note: student.note || null })) });
-    toast(`${data.updated_count || 0} register row(s) saved.`, "success");
-    await loadRegister();
-  }
-
-  async function confirmRegister() {
-    if (!state.register.classKey) return toast("Choose a class first.", "error");
-    try {
-      await universalWrite("confirmRegister", { date: state.register.date, classKey: state.register.classKey, sessionSlot: state.register.slot });
-      toast("Register confirmed and locked from casual editing.", "success");
-      await loadRegister();
-    } catch (error) {
-      toast(error.code === "REGISTER_INCOMPLETE" ? "Complete every expected pupil before confirming." : error.message, "error");
-    }
-  }
-
-  function renderStaff() {
-    const query = $("#staffSection").value.trim().toLowerCase();
-    const filter = $("#staffStatus").value;
-    const rows = state.staffRows.filter((staff) => (!query || `${staff.department || ""} ${staff.designation || ""}`.toLowerCase().includes(query)) && (!filter || staff.status === filter));
-    const counts = { present: 0, late: 0, absent: 0, incomplete: 0 };
-    state.staffRows.forEach((row) => { if (row.status === "late") counts.late += 1; else if (row.status === "absent") counts.absent += 1; else if (row.status === "incomplete" || !row.departure) counts.incomplete += 1; else if (row.status === "present") counts.present += 1; });
-    $("#staffPresentCount").textContent = counts.present;
-    $("#staffLateCount").textContent = counts.late;
-    $("#staffAbsentCount").textContent = counts.absent;
-    $("#staffIncompleteCount").textContent = counts.incomplete;
-    $("#staffEmpty").style.display = rows.length ? "none" : "block";
-    $("#staffTable").innerHTML = rows.length ? `<div class="table-scroll"><table><thead><tr><th>Staff member</th><th>Position</th><th>Arrival</th><th>Departure</th><th>Status</th><th>Method</th></tr></thead><tbody>${rows.map((row) => `<tr><td><strong>${esc(row.full_name)}</strong><small>${esc(row.staff_number || "No staff number")}</small></td><td>${esc(row.designation || row.department || "—")}</td><td>${esc(displayTime(row.arrival))}</td><td>${esc(displayTime(row.departure))}</td><td><span class="badge ${statusClass(row.status)}">${esc(cleanStatus(row.status))}</span></td><td>${esc(cleanStatus(row.method || "manual"))}</td></tr>`).join("")}</tbody></table></div>` : "";
-  }
-
-  async function loadStaffLogbook() {
-    $("#staffDate").value ||= todayIso();
-    const data = await universalRead("staff_logbook", { date: $("#staffDate").value });
-    state.staffRows = data.staff || [];
-    renderStaff();
-    setOptions("#manualStaffPerson", state.staffRows.map((staff) => ({ value: staff.id, label: `${staff.full_name}${staff.staff_number ? ` · ${staff.staff_number}` : ""}` })), "Choose staff member");
-  }
-
-  async function loadManualPeople() {
-    if (!state.staffRows.length) await loadStaffLogbook();
-    $("#manualStaffDate").value ||= todayIso();
-    $("#manualStaffTime").value ||= new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+    $("#healthList").innerHTML = `<div class="health-item"><span class="health-check ${state.devices.length ? "good" : "muted"}">${state.devices.length ? "✓" : "–"}</span><div><b>${state.devices.length ? `${state.devices.length} registered device${state.devices.length === 1 ? "" : "s"}` : "Web scanner ready"}</b><small>${state.devices.length ? "Health status comes from the live Device Registry." : "Use a phone camera or compatible NFC reader."}</small></div></div><div class="health-item"><span class="health-check ${importCount ? "good" : "muted"}">${importCount ? "✓" : "–"}</span><div><b>${importCount ? `${importCount} import batch${importCount === 1 ? "" : "es"}` : "No device imports yet"}</b><small>Imported records are previewed and checksum-protected.</small></div></div>`;
   }
 
   async function loadCredentialPeople() {
@@ -298,7 +213,7 @@
     const data = type === "student" ? await studentRead("students", { search }) : await staffRead("staff", { search });
     const people = type === "student" ? (data.students || []).map((person) => ({ ...person, personType: "student", displayName: person.name, secondary: `${person.class_key || ""}${person.admno ? ` · ${person.admno}` : ""}` })) : (data.staff || []).map((person) => ({ ...person, personType: "staff", displayName: person.full_name, secondary: `${person.designation || person.staff_category || ""}${person.staff_number ? ` · ${person.staff_number}` : ""}` }));
     if (type === "student") state.students = people; else state.staff = people;
-    $("#credentialPeople").innerHTML = people.length ? people.map((person) => `<button class="person-item ${state.selectedPerson?.id === person.id ? "active" : ""}" data-person-id="${esc(person.id)}"><span class="avatar small-avatar">${esc((person.displayName || "P").slice(0, 1).toUpperCase())}</span><span><b>${esc(person.displayName)}</b><small>${esc(person.secondary || "")}</small></span><span>›</span></button>`).join("") : `<div class="empty">No live ${type === "student" ? "pupils" : "staff"} match that search.</div>`;
+    $("#credentialPeople").innerHTML = people.length ? people.map((person) => `<button class="person-item ${state.selectedPerson?.id === person.id ? "active" : ""}" data-person-id="${esc(person.id)}"><span class="avatar small-avatar">${avatarMarkup(person, "P")}</span><span><b>${esc(person.displayName)}</b><small>${esc(person.secondary || "")}</small></span><span>›</span></button>`).join("") : `<div class="empty">No live ${type === "student" ? "students" : "staff"} match that search.</div>`;
   }
 
   async function selectCredentialPerson(id) {
@@ -311,7 +226,7 @@
     $("#credentialKind").textContent = type === "student" ? "PUPIL · CENTRAL REGISTRY" : "STAFF · CENTRAL REGISTRY";
     $("#credentialName").textContent = state.selectedPerson.displayName;
     $("#credentialMeta").textContent = state.selectedPerson.secondary;
-    $("#credentialAvatar").textContent = (state.selectedPerson.displayName || "W").slice(0, 1).toUpperCase();
+    $("#credentialAvatar").innerHTML = avatarMarkup(state.selectedPerson);
     const data = await universalRead("credentials", { personType: type, personId: id });
     renderCredentialList(data.credentials || []);
     if (permission("devices.read") || permission("devices.manage") || globalScope()) await loadDevices(true);
@@ -343,41 +258,44 @@
     event.preventDefault();
     if (!state.selectedPerson) return toast("Select a real person first.", "error");
     const raw = $("#credentialRaw").value.trim();
-    if (!raw) return toast("Enter the reader value or external device ID.", "error");
-    const type = $("#credentialType").value;
+    if (!raw) return toast("Tap the NFC card or enter its reader UID.", "error");
+    const type = "nfc_uid";
     const payload = {
       ...(state.selectedPerson.personType === "student" ? { studentId: state.selectedPerson.id } : { staffId: state.selectedPerson.id }),
       credentialType: type,
       rawIdentifier: raw,
-      label: $("#credentialLabel").value.trim() || "Attendance credential",
+      label: $("#credentialLabel").value.trim() || "WTS NFC ID card",
       deviceId: $("#credentialDevice").value || null,
       metadata: { raw_hash: await digest(raw), source: "attendance_operator" },
     };
     await universalWrite("assignCredential", payload);
     $("#credentialRaw").value = "";
-    toast("Credential assigned and activated.", "success");
+    toast("NFC card linked and activated.", "success");
     await selectCredentialPerson(state.selectedPerson.id);
   }
 
   async function loadDevices(forCredential = false) {
     const data = await universalRead("devices");
     state.devices = data.devices || [];
-    if (forCredential) setOptions("#credentialDevice", state.devices.map((device) => ({ value: device.id, label: `${device.device_name} · ${device.device_code}` })), "No device selected");
+    const options = state.devices.map((device) => ({ value: device.id, label: `${device.device_name} · ${device.device_code}` }));
+    if (forCredential) setOptions("#credentialDevice", options, "No reader selected");
+    setOptions("#importDevice", options, "No device selected");
     $("#deviceEmpty").style.display = state.devices.length ? "none" : "block";
     $("#deviceGrid").innerHTML = state.devices.length ? state.devices.map((device) => `<article class="device-card"><div class="device-top"><div><small class="eyebrow">${esc(device.device_code)}</small><h3>${esc(device.device_name)}</h3></div><span class="badge ${statusClass(device.computed_status || device.status)}">${esc(cleanStatus(device.computed_status || device.status || "unknown"))}</span></div><div class="device-details"><div><span>Category</span><b>${esc(cleanStatus(device.device_type || "—"))}</b></div><div><span>Location</span><b>${esc(device.assigned_gate || device.location || "Unassigned")}</b></div><div><span>Connection</span><b>${esc(device.connection_type || "—")}</b></div><div><span>Sources</span><b>${esc((device.supported_sources || []).join(", ") || "—")}</b></div><div><span>Last sync</span><b>${esc(displayTime(device.last_sync_at))}</b></div><div><span>Health</span><b>${esc(cleanStatus(device.health_status || "unknown"))}</b></div></div></article>`).join("") : "";
   }
 
   async function addDevice() {
-    const deviceCode = window.prompt("Exact device code from the purchased terminal (required):", "");
+    const deviceCode = window.prompt("Unique code printed on or assigned to this school device:", "");
     if (!deviceCode?.trim()) return;
     const deviceName = window.prompt("Device name:", "");
     if (!deviceName?.trim()) return;
-    const deviceType = window.prompt("Device category (standalone_terminal, usb_hid_reader, usb_ccid_reader, android_scanner, web_scanner):", "standalone_terminal");
-    if (!deviceType?.trim()) return;
-    const assignedGate = window.prompt("Physical location:", "") || "";
-    const connectionType = window.prompt("Connection (wifi, ethernet, cellular, usb or mixed):", "wifi") || "wifi";
-    const sources = deviceType === "standalone_terminal" ? ["standalone_terminal"] : deviceType === "usb_hid_reader" ? ["usb_hid"] : deviceType === "usb_ccid_reader" ? ["usb_ccid"] : ["qr", "nfc", "rfid"];
-    const result = await studentWrite("registerDevice", { deviceCode: deviceCode.trim(), deviceName: deviceName.trim(), deviceType: deviceType.trim(), assignedGate, supportedSources: sources, connectionType, offlineEnabled: window.confirm("Will this device store logs while offline?"), deploymentMode: "production" });
+    const modality = (window.prompt("Credential method: qr, nfc, or both", "both") || "").trim().toLowerCase();
+    if (!['qr', 'nfc', 'both'].includes(modality)) return toast("Choose qr, nfc, or both.", "error");
+    const assignedGate = window.prompt("School location (for example Main gate):", "") || "";
+    const connectionType = (window.prompt("Connection: wifi, mobile, usb, bluetooth, or mixed", modality === "nfc" ? "usb" : "wifi") || "wifi").trim().toLowerCase();
+    const sources = modality === "both" ? ["qr", "nfc"] : [modality];
+    const deviceType = modality === "qr" ? "web_scanner" : modality === "nfc" ? "usb_hid_reader" : "android_scanner";
+    const result = await studentWrite("registerDevice", { deviceCode: deviceCode.trim(), deviceName: deviceName.trim(), deviceType, assignedGate, supportedSources: sources, connectionType, offlineEnabled: window.confirm("Should this device queue encrypted scans while offline?"), deploymentMode: "production" });
     if (result.device?.raw_secret) await showSecret("Device credential", result.device.raw_secret, false);
     toast("Real device registered. Store the device secret securely.", "success");
     await loadDevices();
@@ -484,9 +402,7 @@
     if (!personType || !["student", "staff"].includes(personType.toLowerCase())) return;
     const personId = window.prompt("Enter the exact Central Registry person ID for this real identity:", "");
     if (!personId?.trim()) return;
-    const credentialType = window.prompt("Credential type (external_device_user_id, nfc_uid, rfid_uid, generic_card_uid):", "external_device_user_id");
-    if (!credentialType?.trim()) return;
-    await universalWrite("mapImportRow", { rowId: row.id, [personType.toLowerCase() === "student" ? "studentId" : "staffId"]: personId.trim(), credentialType: credentialType.trim(), rawIdentifier: row.raw_identifier, externalUserId: row.external_user_id, deviceId: $("#importDevice").value || null });
+    await universalWrite("mapImportRow", { rowId: row.id, [personType.toLowerCase() === "student" ? "studentId" : "staffId"]: personId.trim(), credentialType: "nfc_uid", rawIdentifier: row.raw_identifier, externalUserId: row.external_user_id, deviceId: $("#importDevice").value || null });
     const refreshed = await universalRead("import_rows", { batchId: state.import.batchId });
     state.import.rows = refreshed.rows || [];
     renderImportPreview();
@@ -555,7 +471,7 @@
 
   async function renderSettings() {
     const config = state.context?.config || {};
-    $("#contextDetails").innerHTML = `<div><dt>Academic session</dt><dd>${esc(state.context?.session || config.operational_session || "—")}</dd></div><div><dt>Academic term</dt><dd>${esc(state.context?.term || config.operational_term || "—")}</dd></div><div><dt>Configuration source</dt><dd>Central Registry promotion context</dd></div><div><dt>Enabled modalities</dt><dd>${esc((config.enabled_modalities || []).join(", ") || "Manual / QR / card ready")}</dd></div><div><dt>Automatic absence</dt><dd>${config.automatic_absence_enabled ? "Enabled by policy" : "Not enabled"}</dd></div><div><dt>Parent notifications</dt><dd>${config.parent_notifications_enabled ? "Enabled by approved contract" : "Not enabled"}</dd></div>`;
+    $("#contextDetails").innerHTML = `<div><dt>Academic session</dt><dd>${esc(state.context?.session || config.operational_session || "—")}</dd></div><div><dt>Academic term</dt><dd>${esc(state.context?.term || config.operational_term || "—")}</dd></div><div><dt>Configuration source</dt><dd>Central Registry promotion context</dd></div><div><dt>Operator methods</dt><dd>QR pass and NFC card</dd></div><div><dt>Absence</dt><dd>Derived from expected roster and confirmed events</dd></div><div><dt>Parent notifications</dt><dd>${config.parent_notifications_enabled ? "Enabled by approved contract" : "Not enabled"}</dd></div>`;
     const permissions = state.context?.permissions || [];
     $("#roleDetails").innerHTML = permissions.length ? permissions.map((item) => `<span class="permission-chip">${esc(item)}</span>`).join("") : `<div class="empty">No Attendance actions were granted.</div>`;
     await loadRosterSyncStatus();
@@ -583,6 +499,13 @@
     $("#qrPreview").hidden = !makeQr;
     $("#printQrDialog").hidden = !makeQr;
     state.lastQr = makeQr ? value : null;
+    state.lastQrPersonId = makeQr ? state.selectedPerson?.id || null : null;
+    if (makeQr && state.selectedPerson) {
+      $("#printAvatar").innerHTML = avatarMarkup(state.selectedPerson);
+      $("#printKind").textContent = state.selectedPerson.personType === "student" ? "STUDENT" : "STAFF";
+      $("#printName").textContent = state.selectedPerson.displayName;
+      $("#printMeta").textContent = state.selectedPerson.secondary || "Central Registry identity";
+    }
     if (makeQr && window.WTS_VENDOR?.QRCode) {
       try { $("#qrPreview").src = await window.WTS_VENDOR.QRCode.toDataURL(value, { width: 260, margin: 2, errorCorrectionLevel: "M" }); } catch { $("#qrPreview").hidden = true; }
     }
@@ -606,38 +529,16 @@
       if (event.target.closest("[data-review]")) reviewCorrection(event).catch((error) => toast(error.message, "error"));
       const importRow = event.target.closest("[data-import-row]");
       if (importRow) { state.import.selectedRowId = importRow.dataset.importRow; renderImportPreview(); }
-      const statusButton = event.target.closest("[data-register-id] [data-status]");
-      if (statusButton) { const row = state.register.students.find((student) => student.id === statusButton.closest("[data-register-id]").dataset.registerId); if (row) { row.status = statusButton.dataset.status; renderRegister(); } }
-      const statusSelect = event.target.closest("[data-status-select]");
-      if (statusSelect) { const row = state.register.students.find((student) => student.id === statusSelect.closest("[data-register-id]").dataset.registerId); if (row && statusSelect.value) { row.status = statusSelect.value; renderRegister(); } }
-      const selectCorrection = event.target.closest("[data-select-correction]");
-      if (selectCorrection) { state.register.selectedId = selectCorrection.dataset.selectCorrection; $("#correctionRecordId").value = state.register.students.find((student) => student.id === state.register.selectedId)?.record_id || ""; toast("Register row selected for correction request."); }
     });
     $("#refresh").onclick = () => loadContext().catch((error) => toast(error.message, "error"));
     $("#login").onclick = signOut;
-    $("#loadRegister").onclick = () => loadRegister().catch((error) => toast(error.message, "error"));
-    $("#registerDate").onchange = () => loadRegister().catch((error) => toast(error.message, "error"));
-    $("#registerClass").onchange = () => loadRegister().catch((error) => toast(error.message, "error"));
-    $("#registerSlot").onchange = () => loadRegister().catch((error) => toast(error.message, "error"));
-    $("#registerSearch").oninput = renderRegister;
-    $("#markAllPresent").onclick = () => { state.register.students.forEach((student) => { student.status = "present"; }); renderRegister(); };
-    $("#saveRegister").onclick = () => saveRegister().catch((error) => toast(error.message, "error"));
-    $("#confirmRegister").onclick = () => confirmRegister().catch((error) => toast(error.message, "error"));
-    $("#printRegister").onclick = () => printArea("print-register");
-    $("#registerCorrectionForm").onsubmit = async (event) => { event.preventDefault(); const recordId = $("#correctionRecordId").value; if (!recordId) return toast("Select a saved register row first.", "error"); await universalWrite("createRegisterCorrection", { personType: "student", recordId, requestedStatus: $("#correctionStatus").value, requestedNote: "Register correction requested", reason: $("#correctionReason").value.trim() }); $("#correctionReason").value = ""; toast("Correction request submitted.", "success"); };
-    $("#loadStaffLogbook").onclick = () => loadStaffLogbook().catch((error) => toast(error.message, "error"));
-    $("#staffDate").onchange = () => loadStaffLogbook().catch((error) => toast(error.message, "error"));
-    $("#staffSection").oninput = renderStaff;
-    $("#staffStatus").onchange = renderStaff;
-    $("#printStaff").onclick = () => printArea("print-staff");
-    $("#manualStaffForm").onsubmit = async (event) => { event.preventDefault(); const date = $("#manualStaffDate").value, time = $("#manualStaffTime").value; await controlsWrite("createManualEntry", { personType: "staff", personId: $("#manualStaffPerson").value, attendanceDate: date, eventType: $("#manualStaffEvent").value, eventTime: `${date}T${time}:00+01:00`, reasonCode: "manual_operator", reason: $("#manualStaffReason").value.trim(), session: state.context?.session, term: state.context?.term }); $("#manualStaffReason").value = ""; toast("Staff manual entry submitted for review.", "success"); };
     $("#refreshScanEvents").onclick = () => loadOverview().then(() => renderEvents("#scanEvents", [...(state.summary?.latest_events || []), ...(state.summary?.staff?.latest_events || [])])).catch((error) => toast(error.message, "error"));
     $("#credentialPersonType").onchange = () => { state.selectedPerson = null; $("#credentialDetail").hidden = true; $("#credentialEmpty").hidden = false; loadCredentialPeople().catch((error) => toast(error.message, "error")); };
     $("#searchCredentials").onclick = () => loadCredentialPeople().catch((error) => toast(error.message, "error"));
     $("#credentialSearch").onkeydown = (event) => { if (event.key === "Enter") loadCredentialPeople().catch((error) => toast(error.message, "error")); };
     $("#issueQr").onclick = () => issueQr().catch((error) => toast(error.message, "error"));
     $("#credentialAssignForm").onsubmit = (event) => assignCredential(event).catch((error) => toast(error.message, "error"));
-    $("#printQr").onclick = () => state.lastQr ? showSecret("Secure QR attendance token", state.lastQr, true) : toast("Issue a QR credential first.", "error");
+    $("#printQr").onclick = () => state.lastQr && state.lastQrPersonId === state.selectedPerson?.id ? showSecret("Secure QR attendance token", state.lastQr, true) : toast("Generate this person's QR pass before printing.", "error");
     $("#addDevice").onclick = () => addDevice().catch((error) => toast(error.message, "error"));
     $("#importFile").onchange = () => { const file = $("#importFile").files?.[0]; $("#importFileStatus").textContent = file ? `${file.name} selected. Preview before processing.` : "No file selected."; };
     $("#previewImport").onclick = () => previewImport().catch((error) => toast(error.message, "error"));
@@ -652,8 +553,6 @@
     $("#closeSecretButton").onclick = () => $("#secretDialog").close();
     $("#copySecret").onclick = () => navigator.clipboard?.writeText($("#secretValue").textContent).then(() => toast("Copied to clipboard.", "success"));
     $("#printQrDialog").onclick = () => printArea("print-qr");
-    $("#registerDate").value = todayIso();
-    $("#staffDate").value = todayIso();
     $("#reportFrom").value = monthStart();
     $("#reportTo").value = todayIso();
   }

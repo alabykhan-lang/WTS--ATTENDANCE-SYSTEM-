@@ -10,13 +10,11 @@
   const $$ = (selector) => [...document.querySelectorAll(selector)];
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
+  const requestedSource = new URLSearchParams(window.location.search).get("source");
+  const initialSource = ["qr", "nfc"].includes(requestedSource) ? requestedSource : null;
   const sourceLabels = {
     qr: "QR",
     nfc: "NFC",
-    rfid: "RFID",
-    usb_hid: "USB Reader",
-    usb_ccid: "Smart Card",
-    standalone_terminal: "Terminal",
   };
   const sourceHelp = {
     qr: [
@@ -28,26 +26,6 @@
       "Tap an NFC card",
       "Start NFC reader",
       "Hold the written NFC card against the back of this phone.",
-    ],
-    rfid: [
-      "Read an RFID card",
-      "Focus RFID reader",
-      "Tap the card on the connected RFID reader, then press Enter.",
-    ],
-    usb_hid: [
-      "Use the USB reader",
-      "Focus USB reader",
-      "Scan a card with the connected keyboard-style reader.",
-    ],
-    usb_ccid: [
-      "Use the smart-card reader",
-      "Focus smart-card reader",
-      "Insert or tap the card, then submit the returned credential.",
-    ],
-    standalone_terminal: [
-      "Receive terminal credential",
-      "Focus terminal input",
-      "Submit the credential supplied by the gate terminal.",
     ],
   };
   const friendly = {
@@ -179,13 +157,14 @@
       localStorage.getItem(SECRET_KEY) ||
       "";
     if (config?.deviceCode && config?.installationId && secret) {
+      if (initialSource) config.source = initialSource;
       state.config = config;
       state.secret = secret;
       return true;
     }
     if (config?.deviceCode) {
       $("#deviceCode").value = config.deviceCode;
-      $("#defaultSource").value = config.source || "qr";
+      $("#defaultSource").value = initialSource || config.source || "qr";
       $("#attachLocation").checked = config.attachLocation === true;
     }
     return false;
@@ -240,7 +219,7 @@
     $("#settingsSource").value = source;
     $("#sourceBadge").textContent =
       sourceLabels[source] || source.toUpperCase();
-    const copy = sourceHelp[source] || sourceHelp.rfid;
+    const copy = sourceHelp[source] || sourceHelp.qr;
     $("#scanTitle").textContent = copy[0];
     $("#tapTitle").textContent = copy[1];
     $("#tapHelp").textContent = copy[2];
@@ -513,7 +492,7 @@
         "error",
         "QR_NOT_SUPPORTED",
         "QR detection is unavailable",
-        "Use Chrome on Android or submit the credential token manually.",
+        "Use Chrome on Android, paste the QR token, or use the NFC reader input.",
       );
     try {
       const detector = new BarcodeDetector({ formats: ["qr_code"] });
@@ -738,7 +717,7 @@
         : ($("#credentialInput").focus(), toast("Reader input is ready."));
   $("#tapZone").onclick = $("#startScan").onclick;
   $("#stopCamera").onclick = stopCamera;
-  $("#manualForm").onsubmit = (event) => {
+  $("#readerForm").onsubmit = (event) => {
     event.preventDefault();
     submitCredential($("#credentialInput").value);
   };
@@ -763,6 +742,7 @@
       .register("/scanner-sw.js", { scope: "/" })
       .catch(() => {});
   updateNetwork();
+  if (initialSource) $("#defaultSource").value = initialSource;
   if (loadConfiguration()) openScanner();
   else $("#deviceCode").focus();
 })();

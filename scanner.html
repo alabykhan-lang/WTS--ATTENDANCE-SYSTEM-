@@ -51,14 +51,8 @@
           <label
             >Scanner source
             <select id="defaultSource">
-              <option value="qr">Phone camera — QR</option>
-              <option value="nfc">Phone NFC reader</option>
-              <option value="rfid">RFID reader</option>
-              <option value="usb_hid">USB keyboard reader</option>
-              <option value="usb_ccid">USB smart-card reader</option>
-              <option value="standalone_terminal">
-                Standalone gate terminal
-              </option>
+              <option value="qr">Phone or computer camera — QR</option>
+              <option value="nfc">Phone NFC or USB NFC reader</option>
             </select>
           </label>
           <label class="check"
@@ -139,8 +133,8 @@
           <button class="primary wide scan-button" id="startScan" type="button">
             Start QR scanner
           </button>
-          <div class="divider"><span>OR USE A READER / PASTE TOKEN</span></div>
-          <form class="manual-row" id="manualForm">
+          <div class="divider"><span>OR USE AN NFC READER / PASTE QR TOKEN</span></div>
+          <form class="reader-row" id="readerForm">
             <input
               id="credentialInput"
               autocomplete="off"

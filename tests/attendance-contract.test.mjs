@@ -47,3 +47,36 @@ test("portal SSO launch keeps the Attendance app locked until callback exchange"
   assert.match(portalLaunch, /return false/);
   assert.doesNotMatch(portalLaunch, /return true/);
 });
+
+test("operator workspace exposes five focused areas and no manual marking screen", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const primary = [...html.matchAll(/<button class="nav(?: active)?" data-view="([^"]+)">/g)].map((match) => match[1]);
+
+  assert.deepEqual(primary, ["overview", "scan", "credentials", "imports", "reports"]);
+  assert.doesNotMatch(html, /Manual Marking|id="view-manual"|id="manualStaffForm"/);
+  assert.match(html, /Two trusted credentials\. One attendance record\./);
+});
+
+test("credential office and scanner are restricted to QR and NFC", async () => {
+  const [html, scannerHtml, appSource] = await Promise.all([
+    readFile(new URL("../index.html", import.meta.url), "utf8"),
+    readFile(new URL("../scanner.html", import.meta.url), "utf8"),
+    readFile(new URL("../app.js", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(html, /Generate QR pass/);
+  assert.match(html, /value="nfc_uid"/);
+  assert.doesNotMatch(html, /rfid_uid|fingerprint_device_user_id|temporary_pass/);
+  assert.match(scannerHtml, /value="qr"/);
+  assert.match(scannerHtml, /value="nfc"/);
+  assert.doesNotMatch(scannerHtml, /value="rfid"|value="usb_ccid"|value="standalone_terminal"/);
+  assert.doesNotMatch(appSource, /createManualEntry/);
+});
+
+test("sync centre documents real-time, encrypted offline retry, and file import", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  assert.match(html, /Real-time/);
+  assert.match(html, /encrypts pending events/);
+  assert.match(html, /USB, Bluetooth or Wi-Fi/);
+  assert.match(html, /\.csv,\.xlsx,\.xls,\.txt,\.tsv/);
+});

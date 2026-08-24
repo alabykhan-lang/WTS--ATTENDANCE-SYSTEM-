@@ -387,7 +387,7 @@ select:focus {
   background: #e4e7ec;
   flex: 1;
 }
-.manual-row {
+.reader-row {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 8px;
@@ -587,10 +587,10 @@ dialog::backdrop {
     justify-self: start;
     padding-left: 0;
   }
-  .manual-row {
+  .reader-row {
     grid-template-columns: 1fr;
   }
-  .manual-row .secondary {
+  .reader-row .secondary {
     width: 100%;
   }
 }
