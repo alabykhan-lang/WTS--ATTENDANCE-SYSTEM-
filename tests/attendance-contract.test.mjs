@@ -110,15 +110,19 @@ test("scanner opens as an always-ready camera with a bundled decoder fallback", 
   assert.match(source, /WTS_VENDOR\?\.jsQR/);
   assert.match(source, /Remove this card first/);
   assert.match(source, /Allow and start camera/);
+  assert.match(source, /navigator\.wakeLock\.request\("screen"\)/);
+  assert.match(source, /cameraRestartTimer/);
+  assert.match(source, /getVideoTracks\(\)\[0\]\?\.addEventListener\("ended"/);
   assert.match(vendorEntry, /import jsQR from "jsqr"/);
   assert.match(manifest, /scanner-icon\.svg/);
   assert.match(manifest, /"display": "standalone"/);
 });
 
 test("printable identity card has separate front identity and back QR faces", async () => {
-  const [html, source] = await Promise.all([
+  const [html, source, styles] = await Promise.all([
     readFile(new URL("../index.html", import.meta.url), "utf8"),
     readFile(new URL("../app.js", import.meta.url), "utf8"),
+    readFile(new URL("../styles.css", import.meta.url), "utf8"),
   ]);
 
   assert.match(html, /id-card-face id-card-front/);
@@ -129,4 +133,13 @@ test("printable identity card has separate front identity and back QR faces", as
   assert.match(html, /Print front and back/);
   assert.match(source, /person\.reference/);
   assert.match(source, /person\.group_name/);
+  assert.match(html, /85\.60 × 53\.98 MM/);
+  assert.match(styles, /width:85\.6mm;height:53\.98mm/);
+});
+
+test("universal Attendance requests prefer the current RPC before compatibility fallbacks", async () => {
+  const source = await readFile(new URL("../api/rpc.js", import.meta.url), "utf8");
+  assert.match(source, /attendance_universal_admin_write_api: \["attendance_universal_admin_write_api", "attendance_admin_write_api"\]/);
+  assert.match(source, /Attendance RPC completed/);
+  assert.doesNotMatch(source, /attendance_universal_admin_write_api: \["attendance_admin_write_api", "attendance_universal_admin_write_api"\]/);
 });

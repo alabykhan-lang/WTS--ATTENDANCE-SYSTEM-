@@ -71,6 +71,8 @@
     cameraClearFrames: 0,
     nfcReader: null,
     wakeLock: null,
+    wakeRetryTimer: 0,
+    cameraRestartTimer: 0,
     installPrompt: null,
     syncing: false,
     lastFingerprint: "",
@@ -245,10 +247,21 @@
 
   async function requestWakeLock() {
     if (!("wakeLock" in navigator) || document.hidden || state.wakeLock) return;
+    if (state.wakeRetryTimer) window.clearTimeout(state.wakeRetryTimer);
+    state.wakeRetryTimer = 0;
     try {
       state.wakeLock = await navigator.wakeLock.request("screen");
-      state.wakeLock.addEventListener("release", () => { state.wakeLock = null; });
-    } catch {}
+      state.wakeLock.addEventListener("release", () => {
+        state.wakeLock = null;
+        if (!document.hidden && state.config) {
+          state.wakeRetryTimer = window.setTimeout(requestWakeLock, 15000);
+        }
+      });
+    } catch {
+      if (!document.hidden && state.config) {
+        state.wakeRetryTimer = window.setTimeout(requestWakeLock, 30000);
+      }
+    }
   }
 
   function startActiveReader(automatic = false) {
@@ -527,6 +540,8 @@
 
   async function startCamera(automatic = false) {
     if (state.cameraStream) return;
+    if (state.cameraRestartTimer) window.clearTimeout(state.cameraRestartTimer);
+    state.cameraRestartTimer = 0;
     state.cameraPaused = false;
     if (!navigator.mediaDevices?.getUserMedia)
       return showResult(
@@ -561,6 +576,12 @@
       });
       const video = $("#cameraVideo");
       video.srcObject = state.cameraStream;
+      const activeStream = state.cameraStream;
+      activeStream.getVideoTracks()[0]?.addEventListener("ended", () => {
+        if (state.cameraStream !== activeStream || state.cameraPaused || document.hidden) return;
+        stopCamera(false);
+        state.cameraRestartTimer = window.setTimeout(() => startCamera(true), 1500);
+      });
       await video.play();
       $("#cameraBox").hidden = false;
       $("#tapZone").hidden = true;
@@ -614,6 +635,8 @@
 
   function stopCamera(manual = true) {
     state.cameraPaused = manual;
+    if (manual && state.cameraRestartTimer) window.clearTimeout(state.cameraRestartTimer);
+    if (manual) state.cameraRestartTimer = 0;
     if (state.cameraLoop) cancelAnimationFrame(state.cameraLoop);
     state.cameraLoop = 0;
     if (state.cameraStream) {

@@ -26,13 +26,15 @@ const OPERATOR_RPCS = new Set([
 // an additive RPC is created. Keep both the established and universal Attendance
 // names available; the shared adapter retries a 404 before trying the alternate.
 const RPC_COMPATIBILITY_ALIASES = Object.freeze({
-  attendance_universal_admin_read_api: ["attendance_admin_read_api", "attendance_universal_admin_read_api"],
-  attendance_universal_admin_write_api: ["attendance_admin_write_api", "attendance_universal_admin_write_api"],
+  attendance_universal_admin_read_api: ["attendance_universal_admin_read_api", "attendance_admin_read_api"],
+  attendance_universal_admin_write_api: ["attendance_universal_admin_write_api", "attendance_admin_write_api"],
   attendance_admin_read_api: ["attendance_admin_read_api", "attendance_universal_admin_read_api"],
   attendance_admin_write_api: ["attendance_admin_write_api", "attendance_universal_admin_write_api"],
 });
 
 export default async function handler(req, res) {
+  const startedAt = Date.now();
+  const requestId = req.headers?.["x-vercel-id"] || null;
   if (req.method !== "POST") return sendJson(res, { ok: false, code: "METHOD_NOT_ALLOWED" }, 405);
   if (!sameOrigin(req)) return sendJson(res, { ok: false, code: "ORIGIN_NOT_ALLOWED" }, 403);
   const body = await readBody(req);
@@ -71,5 +73,17 @@ export default async function handler(req, res) {
   if (!result?.ok && ["RESULT_SESSION_NOT_ACTIVE", "RESULT_SESSION_REQUIRED", "CENTRAL_IDENTITY_NOT_ACTIVE", "PORTAL_ACCESS_NOT_GRANTED", "ATTENDANCE_SESSION_NOT_ACTIVE", "ADMIN_SESSION_EXPIRED"].includes(safeCode(result, ""))) {
     return sendJson(res, { ok: false, code: safeCode(result, "ATTENDANCE_SESSION_NOT_ACTIVE") }, 401, clearAuthCookies());
   }
-  return sendJson(res, result, result?.ok === false ? 400 : 200);
+  const status = result?.ok === false ? 400 : 200;
+  console.log(JSON.stringify({
+    level: status >= 400 ? "warning" : "info",
+    message: "Attendance RPC completed",
+    route: "/api/rpc",
+    requestId,
+    rpc: name,
+    action,
+    code: safeCode(result, status >= 400 ? "ATTENDANCE_REQUEST_FAILED" : "OK"),
+    status,
+    durationMs: Date.now() - startedAt,
+  }));
+  return sendJson(res, result, status);
 };
