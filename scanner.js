@@ -521,11 +521,53 @@
     } catch {}
   }
 
+  function decodeQrRegion(
+    jsQR,
+    canvas,
+    context,
+    video,
+    sourceX,
+    sourceY,
+    sourceWidth,
+    sourceHeight,
+  ) {
+    if (!context) return "";
+    const width = Math.max(1, Math.round(sourceWidth));
+    const height = Math.max(1, Math.round(sourceHeight));
+    const x = Math.max(0, Math.round(sourceX));
+    const y = Math.max(0, Math.round(sourceY));
+    const scale = Math.min(1, 1280 / Math.max(width, height));
+    canvas.width = Math.max(1, Math.round(width * scale));
+    canvas.height = Math.max(1, Math.round(height * scale));
+    try {
+      context.drawImage(
+        video,
+        x,
+        y,
+        width,
+        height,
+        0,
+        0,
+        canvas.width,
+        canvas.height,
+      );
+      const frame = context.getImageData(0, 0, canvas.width, canvas.height);
+      return (
+        jsQR(frame.data, frame.width, frame.height, {
+          inversionAttempts: "attemptBoth",
+        })?.data || ""
+      );
+    } catch {
+      return "";
+    }
+  }
+
   async function detectQrFrame(video, nativeDetector) {
     if (!video.videoWidth || !video.videoHeight) return "";
 
     // Some browsers expose BarcodeDetector but do not decode video reliably.
-    // Fall back to the bundled decoder when native detection is empty or fails.
+    // Fall back to a focused crop and the bundled decoder when native detection
+    // is empty or fails.
     if (nativeDetector) {
       try {
         const codes = await nativeDetector.detect(video);
@@ -538,14 +580,72 @@
 
     const jsQR = window.WTS_VENDOR?.jsQR;
     if (!jsQR) return "";
-    const canvas = $("#cameraCanvas"), maxWidth = 960;
-    const scale = Math.min(1, maxWidth / video.videoWidth);
-    canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
-    canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+    const canvas = $("#cameraCanvas");
     const context = canvas.getContext("2d", { willReadFrequently: true });
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const frame = context.getImageData(0, 0, canvas.width, canvas.height);
-    return jsQR(frame.data, frame.width, frame.height, { inversionAttempts: "attemptBoth" })?.data || "";
+    const focusWidth = Math.min(
+      video.videoWidth,
+      Math.max(1, Math.round(video.videoHeight * 0.78)),
+    );
+    const focusHeight = Math.min(
+      video.videoHeight,
+      Math.max(1, Math.round(video.videoWidth / 0.78)),
+    );
+    const focusX = Math.max(
+      0,
+      Math.round((video.videoWidth - focusWidth) / 2),
+    );
+    const focusY = Math.max(
+      0,
+      Math.round((video.videoHeight - focusHeight) / 2),
+    );
+    const focusedValue = decodeQrRegion(
+      jsQR,
+      canvas,
+      context,
+      video,
+      focusX,
+      focusY,
+      focusWidth,
+      focusHeight,
+    );
+    if (focusedValue) return focusedValue;
+    return decodeQrRegion(
+      jsQR,
+      canvas,
+      context,
+      video,
+      0,
+      0,
+      video.videoWidth,
+      video.videoHeight,
+    );
+  }
+
+  async function tuneCameraTrack(stream) {
+    const track = stream.getVideoTracks()[0];
+    if (!track?.getCapabilities || !track.applyConstraints) return;
+    const capabilities = track.getCapabilities();
+
+    if (
+      Array.isArray(capabilities.focusMode) &&
+      capabilities.focusMode.includes("continuous")
+    ) {
+      try {
+        await track.applyConstraints({
+          advanced: [{ focusMode: "continuous" }],
+        });
+      } catch {}
+    }
+
+    const zoom = capabilities.zoom;
+    const min = Number(zoom?.min);
+    const max = Number(zoom?.max);
+    if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return;
+    const desired = Math.min(2, max);
+    if (desired <= min) return;
+    try {
+      await track.applyConstraints({ advanced: [{ zoom: desired }] });
+    } catch {}
   }
 
   async function startCamera(automatic = false) {
@@ -592,11 +692,12 @@
         stopCamera(false);
         state.cameraRestartTimer = window.setTimeout(() => startCamera(true), 1500);
       });
+      await tuneCameraTrack(state.cameraStream);
       await video.play();
       $("#cameraBox").hidden = false;
       $("#tapZone").hidden = true;
       $("#startScan").hidden = true;
-      $("#cameraStatus").textContent = "Camera active · Show the QR side of the ID card";
+      $("#cameraStatus").textContent = "Camera active · Center the QR inside the frame";
       requestWakeLock();
       let lastCheck = 0;
       const loop = async (timestamp) => {
