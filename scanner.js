@@ -522,13 +522,23 @@
   }
 
   async function detectQrFrame(video, nativeDetector) {
+    if (!video.videoWidth || !video.videoHeight) return "";
+
+    // Some browsers expose BarcodeDetector but do not decode video reliably.
+    // Fall back to the bundled decoder when native detection is empty or fails.
     if (nativeDetector) {
-      const codes = await nativeDetector.detect(video);
-      return codes[0]?.rawValue || "";
+      try {
+        const codes = await nativeDetector.detect(video);
+        const value = Array.isArray(codes)
+          ? codes.find((code) => code?.rawValue)?.rawValue || ""
+          : "";
+        if (value) return value;
+      } catch {}
     }
+
     const jsQR = window.WTS_VENDOR?.jsQR;
-    if (!jsQR || !video.videoWidth || !video.videoHeight) return "";
-    const canvas = $("#cameraCanvas"), maxWidth = 760;
+    if (!jsQR) return "";
+    const canvas = $("#cameraCanvas"), maxWidth = 960;
     const scale = Math.min(1, maxWidth / video.videoWidth);
     canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
     canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
