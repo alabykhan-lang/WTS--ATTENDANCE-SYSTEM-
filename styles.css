@@ -22,3 +22,8 @@
 @media(max-width:1060px){.id-print-sheet{grid-template-columns:1fr;max-height:calc(100vh - 24px);overflow:auto}.id-card-pair{grid-template-columns:repeat(2,minmax(280px,1fr))}.id-print-sheet>.secret-controls{width:100%;text-align:center}}
 @media(max-width:700px){.id-card-pair{grid-template-columns:1fr}.id-card-face{width:100%}.id-print-sheet{padding:18px}.id-print-sheet>.secret-controls{padding-bottom:8px}}
 @media print{.print-qr #secretDialog{width:auto!important}.print-qr .id-print-sheet{width:auto;display:block;padding:0;background:#fff}.print-qr .id-card-pair{display:grid;grid-template-columns:85.6mm 85.6mm;gap:10mm}.print-qr .id-side-wrap{gap:2mm}.print-qr .id-card-face{width:85.6mm;height:53.98mm;border-radius:2.5mm;box-shadow:none;break-inside:avoid}.print-qr .id-card-front{padding:4mm 5mm 3mm}.print-qr .id-card-brand{padding-bottom:2mm}.print-qr .id-card-brand .school-crest{width:9mm;height:9mm}.print-qr .id-front-body{grid-template-columns:19mm 1fr;gap:3mm;margin:3mm 0 2mm}.print-qr .id-avatar{width:19mm;height:21mm;border-radius:2mm}.print-qr .id-person-copy h2{font-size:11pt}.print-qr .id-card-front footer{left:5mm;right:5mm;bottom:2mm}.print-qr .id-card-back{padding:3mm 5mm}.print-qr .id-card-back .qr-preview{width:30mm;max-width:30mm;margin:1mm auto}.print-qr .id-side-label{font-size:7pt}.print-qr .secret-controls,.print-qr .dialog-close{display:none!important}}
+
+/* Official Way to Success Standard Schools crest */
+.auth-logo,.brand-mark{overflow:hidden;background:#fff;border:1px solid rgba(11,31,58,.14)}
+.auth-logo img,.brand-mark img,.school-crest img{display:block;width:100%;height:100%;object-fit:contain}
+.school-crest{overflow:hidden;background:#fff;border:2px solid rgba(255,255,255,.88);color:transparent}

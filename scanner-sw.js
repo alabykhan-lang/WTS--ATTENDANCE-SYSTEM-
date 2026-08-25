@@ -1,12 +1,12 @@
 "use strict";
-const CACHE = "wts-attendance-scanner-v3";
+const CACHE = "wts-attendance-scanner-v4";
 const ASSETS = [
   "/scanner",
   "/scanner.html",
   "/scanner.css",
   "/scanner.js",
   "/vendor.bundle.js",
-  "/scanner-icon.svg",
+  "/assets/wts-school-logo.jpg",
   "/scanner-manifest.webmanifest",
 ];
 self.addEventListener("install", (event) =>

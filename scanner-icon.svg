@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="WTS Scanner">
-  <rect width="512" height="512" rx="112" fill="#0b1f3a"/>
-  <path d="M92 150V92h58M362 92h58v58M420 362v58h-58M150 420H92v-58" fill="none" stroke="#e4b854" stroke-width="30" stroke-linecap="round"/>
-  <rect x="142" y="150" width="228" height="212" rx="44" fill="#ffffff"/>
-  <text x="256" y="280" text-anchor="middle" fill="#0b1f3a" font-family="Arial, sans-serif" font-size="88" font-weight="900">WTS</text>
-  <circle cx="256" cy="326" r="13" fill="#0f6c59"/>
-</svg>

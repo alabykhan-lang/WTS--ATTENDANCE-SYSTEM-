@@ -11,10 +11,10 @@
   "orientation": "any",
   "icons": [
     {
-      "src": "/scanner-icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "src": "/assets/wts-school-logo.jpg",
+      "sizes": "852x857",
+      "type": "image/jpeg",
+      "purpose": "any"
     }
   ]
 }

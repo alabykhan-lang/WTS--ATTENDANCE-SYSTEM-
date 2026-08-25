@@ -26,6 +26,7 @@ const required = [
   "index.html",
   "app.js",
   "styles.css",
+  "assets/wts-school-logo.jpg",
   "supabase/functions/attendance-scan/index.ts",
   "docs/ATTENDANCE-SYSTEM-ARCHITECTURE.md",
 ];

@@ -114,7 +114,7 @@ test("scanner opens as an always-ready camera with a bundled decoder fallback", 
   assert.match(source, /cameraRestartTimer/);
   assert.match(source, /getVideoTracks\(\)\[0\]\?\.addEventListener\("ended"/);
   assert.match(vendorEntry, /import jsQR from "jsqr"/);
-  assert.match(manifest, /scanner-icon\.svg/);
+  assert.match(manifest, /assets\/wts-school-logo\.jpg/);
   assert.match(manifest, /"display": "standalone"/);
 });
 
@@ -134,6 +134,7 @@ test("printable identity card has separate front identity and back QR faces", as
   assert.match(source, /person\.reference/);
   assert.match(source, /person\.group_name/);
   assert.match(html, /85\.60 × 53\.98 MM/);
+  assert.match(html, /assets\/wts-school-logo\.jpg/);
   assert.match(styles, /width:85\.6mm;height:53\.98mm/);
 });
 
