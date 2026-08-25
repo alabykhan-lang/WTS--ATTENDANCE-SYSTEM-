@@ -86,7 +86,7 @@ body {
   background: #f04438;
 }
 main {
-  width: min(760px, 100%);
+  width: min(960px, 100%);
   margin: 0 auto;
   padding: 18px 14px calc(38px + env(safe-area-inset-bottom));
 }
@@ -250,6 +250,30 @@ select:focus {
   align-items: center;
   margin-bottom: 13px;
 }
+.automatic-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--navy);
+}
+.automatic-status > i {
+  width: 11px;
+  height: 11px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #12b76a;
+  box-shadow: 0 0 0 6px #d1fadf;
+}
+.automatic-status b,
+.automatic-status small {
+  display: block;
+}
+.automatic-status small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 500;
+}
 .mode-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -317,7 +341,7 @@ select:focus {
   align-content: center;
   gap: 8px;
   text-align: center;
-  border: 2px dashed #a9bdd2;
+  border: 1px solid #d9e2ec;
   border-radius: 16px;
   background: #f8fafc;
   padding: 20px;
@@ -345,8 +369,9 @@ select:focus {
   border-radius: 16px;
   overflow: hidden;
   background: #07152a;
-  aspect-ratio: 3/4;
-  max-height: 62vh;
+  aspect-ratio: 16/10;
+  min-height: 420px;
+  max-height: 72vh;
 }
 .camera-box video {
   width: 100%;
@@ -355,10 +380,37 @@ select:focus {
 }
 .camera-target {
   position: absolute;
-  inset: 22% 11%;
+  width: min(52%, 390px);
+  aspect-ratio: 1;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   border: 3px solid #fff;
-  border-radius: 17px;
+  border-radius: 22px;
   box-shadow: 0 0 0 999px #07152a66;
+}
+.camera-live {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 24px);
+  padding: 9px 12px;
+  border-radius: 999px;
+  background: #07152acc;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+}
+.camera-live i {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #32d583;
+  box-shadow: 0 0 0 4px #32d58333;
 }
 .camera-close {
   position: absolute;
@@ -371,26 +423,23 @@ select:focus {
   padding: 9px 13px;
   font-weight: 850;
 }
-.divider {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin: 16px 0;
-  color: #98a2b3;
-  font-size: 8px;
-  font-weight: 900;
+.reader-fallback {
+  margin-top: 16px;
+  padding-top: 13px;
+  border-top: 1px solid #e4e7ec;
 }
-.divider:before,
-.divider:after {
-  content: "";
-  height: 1px;
-  background: #e4e7ec;
-  flex: 1;
+.reader-fallback summary {
+  cursor: pointer;
+  color: #667085;
+  font-size: 10px;
+  font-weight: 800;
+  text-align: center;
 }
 .reader-row {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 8px;
+  margin-top: 12px;
 }
 .result-card {
   display: flex;
@@ -527,6 +576,9 @@ dialog::backdrop {
   background: #f8fafc;
   margin: 12px 0;
 }
+#installScanner {
+  margin-top: 10px;
+}
 .setting-meta span,
 .setting-meta code {
   display: block;
@@ -592,5 +644,13 @@ dialog::backdrop {
   }
   .reader-row .secondary {
     width: 100%;
+  }
+  .camera-box {
+    min-height: 0;
+    aspect-ratio: 3/4;
+    max-height: 68vh;
+  }
+  .camera-target {
+    width: 72%;
   }
 }

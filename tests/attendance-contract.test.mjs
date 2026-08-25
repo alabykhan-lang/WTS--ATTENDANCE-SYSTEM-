@@ -93,3 +93,39 @@ test("ID-card search and device setup use the universal permission-scoped flow",
   assert.match(html, /id="readyDeviceCode"/);
   assert.match(html, /id="readyDeviceSecret"/);
 });
+
+test("scanner opens as an always-ready camera with a bundled decoder fallback", async () => {
+  const [html, source, vendorEntry, manifest] = await Promise.all([
+    readFile(new URL("../scanner.html", import.meta.url), "utf8"),
+    readFile(new URL("../scanner.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/vendor-entry.js", import.meta.url), "utf8"),
+    readFile(new URL("../scanner-manifest.webmanifest", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(html, /Automatic QR camera/);
+  assert.match(html, /id="cameraCanvas"/);
+  assert.match(html, /Keep this page open\. The next card will be read automatically\./);
+  assert.match(source, /startActiveReader\(true\)/);
+  assert.match(source, /async function detectQrFrame/);
+  assert.match(source, /WTS_VENDOR\?\.jsQR/);
+  assert.match(source, /Remove this card first/);
+  assert.match(vendorEntry, /import jsQR from "jsqr"/);
+  assert.match(manifest, /scanner-icon\.svg/);
+  assert.match(manifest, /"display": "standalone"/);
+});
+
+test("printable identity card has separate front identity and back QR faces", async () => {
+  const [html, source] = await Promise.all([
+    readFile(new URL("../index.html", import.meta.url), "utf8"),
+    readFile(new URL("../app.js", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(html, /id-card-face id-card-front/);
+  assert.match(html, /id-card-face id-card-back/);
+  assert.match(html, /id="printAvatar"/);
+  assert.match(html, /id="printNumber"/);
+  assert.match(html, /id="qrPreview"/);
+  assert.match(html, /Print front and back/);
+  assert.match(source, /person\.reference/);
+  assert.match(source, /person\.group_name/);
+});

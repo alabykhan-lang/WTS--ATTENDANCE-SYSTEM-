@@ -1,12 +1,20 @@
 {
   "name": "WTS Attendance Gate Scanner",
   "short_name": "WTS Scanner",
-  "description": "School-owned QR, NFC and RFID attendance scanner.",
+  "description": "Always-ready school QR and NFC attendance scanner.",
   "id": "/scanner",
   "start_url": "/scanner",
   "scope": "/",
   "display": "standalone",
   "background_color": "#f4f7fb",
   "theme_color": "#0b1f3a",
-  "orientation": "portrait"
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/scanner-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }

@@ -129,7 +129,24 @@
     </main>
   </div>
 
-  <dialog id="secretDialog"><div class="secret-box id-print-sheet"><button class="dialog-close" id="closeSecret" aria-label="Close">×</button><div class="id-card-preview"><div class="id-card-brand"><b>WTS</b><span>WAY TO SUCCESS STANDARD SCHOOLS<small>Official school identity & attendance card</small></span></div><div class="id-card-person"><div class="avatar id-avatar" id="printAvatar">W</div><div><small id="printKind">STUDENT</small><h2 id="printName">WTS identity</h2><p id="printMeta">Central Registry</p></div></div><img id="qrPreview" class="qr-preview" alt="Secure attendance QR code" hidden><p class="id-card-note">Scan for attendance · If found, return to the school office</p></div><div class="secret-controls"><h2 id="secretTitle">One-time credential</h2><p id="secretIntro">Print this ID card now. The raw value is displayed only once.</p><pre id="secretValue"></pre><div class="dialog-actions"><button class="ghost" id="copySecret">Copy value</button><button class="ghost" id="printQrDialog">Print ID card</button><button class="primary" id="closeSecretButton">Done</button></div></div></div></dialog>
+  <dialog id="secretDialog"><div class="secret-box id-print-sheet"><button class="dialog-close" id="closeSecret" aria-label="Close">×</button>
+    <div class="id-card-pair">
+      <section class="id-side-wrap"><span class="id-side-label">FRONT · IDENTITY</span><article class="id-card-face id-card-front">
+        <header class="id-card-brand"><b class="school-crest">WTS</b><span>WAY TO SUCCESS STANDARD SCHOOLS<small>EJIGBO, LAGOS STATE</small></span></header>
+        <div class="id-front-body"><div class="avatar id-avatar" id="printAvatar">W</div><div class="id-person-copy"><small id="printKind">STUDENT</small><h2 id="printName">WTS identity</h2><p>Official School Identity Card</p></div></div>
+        <dl class="id-fields"><div><dt id="printNumberLabel">STUDENT NUMBER</dt><dd id="printNumber">—</dd></div><div><dt id="printGroupLabel">CLASS</dt><dd id="printGroup">—</dd></div><div><dt>SESSION</dt><dd id="printSession">—</dd></div></dl>
+        <footer><span>Property of Way to Success Standard Schools</span><b>WTS</b></footer>
+      </article></section>
+      <section class="id-side-wrap"><span class="id-side-label">BACK · ATTENDANCE QR</span><article class="id-card-face id-card-back">
+        <header class="id-back-brand"><b class="school-crest">WTS</b><span>WAY TO SUCCESS STANDARD SCHOOLS</span></header>
+        <div class="id-back-copy"><small>ATTENDANCE QR CODE</small><h2>Show this side to the scanner</h2></div>
+        <img id="qrPreview" class="qr-preview" alt="Secure attendance QR code" hidden>
+        <div class="id-back-person"><b id="printBackName">WTS identity</b><span id="printBackNumber">—</span></div>
+        <p class="id-card-note">This card is for school identification and attendance. If found, return it to the school office.</p>
+      </article></section>
+    </div>
+    <aside class="secret-controls"><h2 id="secretTitle">Two-sided ID card ready</h2><p id="secretIntro">Print the front for identity and the back for automatic QR attendance scanning.</p><pre id="secretValue" hidden></pre><div class="dialog-actions"><button class="ghost" id="copySecret" hidden>Copy value</button><button class="ghost" id="printQrDialog">Print front and back</button><button class="primary" id="closeSecretButton">Done</button></div></aside>
+  </div></dialog>
 
   <dialog id="deviceDialog"><form id="deviceForm" class="setup-dialog">
     <div class="dialog-heading"><div><small class="eyebrow">ADD A SCHOOL DEVICE</small><h2>What device are you setting up?</h2><p>WTS will create the device code and secret after you save.</p></div></div>

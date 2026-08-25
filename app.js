@@ -264,7 +264,7 @@
     const payload = type === "student" ? { studentId: state.selectedPerson.id, credentialType: "qr", label: `${state.selectedPerson.displayName} secure QR` } : { staffId: state.selectedPerson.id, credentialType: "qr", label: `${state.selectedPerson.displayName} secure QR` };
     const data = await universalWrite("issueQr", payload);
     const raw = data.credential?.raw_token;
-    if (raw) await showSecret("QR code ready", raw, true);
+    if (raw) await showSecret("Two-sided ID card ready", raw, true);
     toast("QR code created. Print the ID card before closing the preview.", "success");
     await selectCredentialPerson(state.selectedPerson.id);
   }
@@ -565,20 +565,28 @@
 
   async function showSecret(title, value, makeQr = false) {
     $("#secretTitle").textContent = title;
-    $("#secretIntro").textContent = makeQr ? "Print this ID card now. For safety, the QR value is shown only this time." : "Keep this value safe. It is shown only once.";
+    $("#secretIntro").textContent = makeQr ? "Print the front for identity and the back for automatic QR attendance scanning." : "Keep this value safe. It is shown only once.";
     $("#secretValue").textContent = value;
     $("#qrPreview").hidden = !makeQr;
     $("#printQrDialog").hidden = !makeQr;
     state.lastQr = makeQr ? value : null;
     state.lastQrPersonId = makeQr ? state.selectedPerson?.id || null : null;
     if (makeQr && state.selectedPerson) {
-      $("#printAvatar").innerHTML = avatarMarkup(state.selectedPerson);
-      $("#printKind").textContent = state.selectedPerson.personType === "student" ? "STUDENT" : "STAFF";
-      $("#printName").textContent = state.selectedPerson.displayName;
-      $("#printMeta").textContent = state.selectedPerson.secondary || "Central Registry identity";
+      const person = state.selectedPerson;
+      const isStudent = person.personType === "student";
+      $("#printAvatar").innerHTML = avatarMarkup(person);
+      $("#printKind").textContent = isStudent ? "STUDENT" : "STAFF";
+      $("#printName").textContent = person.displayName;
+      $("#printNumberLabel").textContent = isStudent ? "STUDENT NUMBER" : "STAFF NUMBER";
+      $("#printNumber").textContent = person.reference || "—";
+      $("#printGroupLabel").textContent = isStudent ? "CLASS" : "POSITION / DEPARTMENT";
+      $("#printGroup").textContent = person.group_name || "—";
+      $("#printSession").textContent = state.context?.session || "Current";
+      $("#printBackName").textContent = person.displayName;
+      $("#printBackNumber").textContent = person.reference || "—";
     }
     if (makeQr && window.WTS_VENDOR?.QRCode) {
-      try { $("#qrPreview").src = await window.WTS_VENDOR.QRCode.toDataURL(value, { width: 260, margin: 2, errorCorrectionLevel: "M" }); } catch { $("#qrPreview").hidden = true; }
+      try { $("#qrPreview").src = await window.WTS_VENDOR.QRCode.toDataURL(value, { width: 420, margin: 2, errorCorrectionLevel: "M" }); } catch { $("#qrPreview").hidden = true; }
     }
     $("#secretDialog").showModal();
   }
@@ -611,7 +619,7 @@
     $("#credentialSearch").onkeydown = (event) => { if (event.key === "Enter") loadCredentialPeople().catch((error) => toast(error.message, "error")); };
     $("#issueQr").onclick = () => issueQr().catch((error) => toast(error.message, "error"));
     $("#credentialAssignForm").onsubmit = (event) => assignCredential(event).catch((error) => toast(error.message, "error"));
-    $("#printQr").onclick = () => state.lastQr && state.lastQrPersonId === state.selectedPerson?.id ? showSecret("QR code ready", state.lastQr, true) : toast("Create this person's QR code before printing.", "error");
+    $("#printQr").onclick = () => state.lastQr && state.lastQrPersonId === state.selectedPerson?.id ? showSecret("Two-sided ID card ready", state.lastQr, true) : toast("Create this person's QR code before printing.", "error");
     $("#addDevice").onclick = openDeviceSetup;
     $("#deviceForm").onsubmit = (event) => addDevice(event).catch((error) => toast(error.message, "error"));
     $("#cancelDevice").onclick = () => $("#deviceDialog").close();

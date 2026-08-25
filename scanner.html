@@ -28,8 +28,8 @@
         <small class="eyebrow">SCHOOL-OWNED DEVICE SETUP</small>
         <h1>Connect this scanner</h1>
         <p>
-          Enter the one-time device details generated from Attendance
-          Management. The secret is never displayed again after registration.
+          Enter the device code and secret once. After setup, this scanner opens
+          the camera automatically and stays ready for the next ID card.
         </p>
         <form id="setupForm">
           <label
@@ -88,7 +88,7 @@
           </button>
         </div>
 
-        <section class="mode-card">
+        <section class="mode-card compact-mode">
           <div class="mode-row" role="group" aria-label="Attendance event type">
             <button class="mode active" data-event="check_in" type="button">
               Check in
@@ -97,56 +97,55 @@
               Check out
             </button>
           </div>
-          <label class="test-switch"
-            ><input id="diagnosticMode" type="checkbox" /><span
-              ><b>Verify only</b
-              ><small>Turn on only when checking a credential without recording attendance</small></span
-            ></label
-          >
+          <div class="automatic-status"><i></i><span><b>Automatic scanner</b><small>Keep this page open. The next card will be read automatically.</small></span></div>
         </section>
 
         <section class="scan-card">
           <div class="scan-heading">
             <div>
-              <small class="eyebrow">READY TO RECEIVE</small>
-              <h1 id="scanTitle">Scan a QR code</h1>
+              <small class="eyebrow">ALWAYS READY</small>
+              <h1 id="scanTitle">Automatic QR camera</h1>
             </div>
             <span class="source-badge" id="sourceBadge">QR</span>
           </div>
 
           <div class="camera-box" id="cameraBox" hidden>
             <video id="cameraVideo" playsinline muted></video>
+            <canvas id="cameraCanvas" hidden></canvas>
             <div class="camera-target" aria-hidden="true"></div>
+            <div class="camera-live"><i></i><span id="cameraStatus">Camera active · Show the QR side of the ID card</span></div>
             <button class="camera-close" id="stopCamera" type="button">
-              Close camera
+              Pause camera
             </button>
           </div>
 
           <div class="tap-zone" id="tapZone">
             <div class="scan-icon" id="scanIcon">▣</div>
-            <strong id="tapTitle">Open camera scanner</strong>
+            <strong id="tapTitle">Camera permission needed</strong>
             <span id="tapHelp"
-              >Hold the student or staff QR card inside the frame.</span
+              >Allow the camera once. It will then start automatically whenever this scanner opens.</span
             >
           </div>
 
           <button class="primary wide scan-button" id="startScan" type="button">
-            Start QR scanner
+            Allow and start camera
           </button>
-          <div class="divider"><span>OR USE AN NFC READER / PASTE QR TOKEN</span></div>
-          <form class="reader-row" id="readerForm">
-            <input
-              id="credentialInput"
-              autocomplete="off"
-              autocapitalize="off"
-              spellcheck="false"
-              placeholder="Reader input or credential token"
-              minlength="1"
-              maxlength="512"
-              required
-            />
-            <button class="secondary" type="submit">Submit</button>
-          </form>
+          <details class="reader-fallback">
+            <summary>Use a connected NFC/USB reader or enter a code</summary>
+            <form class="reader-row" id="readerForm">
+              <input
+                id="credentialInput"
+                autocomplete="off"
+                autocapitalize="off"
+                spellcheck="false"
+                placeholder="Reader input"
+                minlength="1"
+                maxlength="512"
+                required
+              />
+              <button class="secondary" type="submit">Read card</button>
+            </form>
+          </details>
         </section>
 
         <section class="result-card idle" id="resultCard" aria-live="polite">
@@ -199,6 +198,12 @@
             >Remember device secret</span
           ></label
         >
+        <label class="check test-switch"
+          ><input id="diagnosticMode" type="checkbox" /><span
+            ><b>Test a card without recording attendance</b
+            ><small>Leave this off during normal gate use.</small></span
+          ></label
+        >
         <div class="setting-meta">
           <span>Installation ID</span><code id="installationPreview">—</code>
         </div>
@@ -209,6 +214,15 @@
           type="button"
         >
           Save settings
+        </button>
+        <button
+          class="secondary wide"
+          id="installScanner"
+          value="cancel"
+          type="button"
+          hidden
+        >
+          Install scanner on this device
         </button>
         <button
           class="danger-button wide"
@@ -222,6 +236,7 @@
     </dialog>
 
     <div id="toasts"></div>
+    <script src="/vendor.bundle.js"></script>
     <script src="/scanner.js"></script>
   </body>
 </html>

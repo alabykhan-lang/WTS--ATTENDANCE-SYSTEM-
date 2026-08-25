@@ -18,9 +18,9 @@
   };
   const sourceHelp = {
     qr: [
-      "Scan a QR code",
-      "Open camera scanner",
-      "Hold the student or staff QR card inside the frame.",
+      "Automatic QR camera",
+      "Camera permission needed",
+      "Allow the camera once. It will stay ready and read each ID card automatically.",
     ],
     nfc: [
       "Tap an NFC card",
@@ -63,7 +63,13 @@
     eventType: "check_in",
     cameraStream: null,
     cameraLoop: 0,
+    cameraBusy: false,
+    cameraPaused: false,
+    lastCameraValue: "",
+    cameraClearFrames: 0,
     nfcReader: null,
+    wakeLock: null,
+    installPrompt: null,
     syncing: false,
     lastFingerprint: "",
     lastScanAt: 0,
@@ -204,6 +210,8 @@
     setSource(state.config.source || "qr");
     renderQueue();
     updateNetwork();
+    requestWakeLock();
+    window.setTimeout(() => startActiveReader(true), 120);
   }
 
   function copySourceOptions() {
@@ -213,7 +221,7 @@
   }
 
   function setSource(source) {
-    stopCamera();
+    stopCamera(false);
     state.config.source = source;
     localStorage.setItem(CONFIG_KEY, JSON.stringify(state.config));
     $("#settingsSource").value = source;
@@ -228,8 +236,27 @@
       source === "nfc" ? "◉" : source === "qr" ? "▣" : "▤";
     $("#credentialInput").placeholder =
       source === "qr"
-        ? "Paste credential token"
+        ? "Enter a QR value only if the camera cannot be used"
         : `${sourceLabels[source] || "Reader"} input`;
+    $(".reader-fallback").open = source === "nfc";
+  }
+
+  async function requestWakeLock() {
+    if (!("wakeLock" in navigator) || document.hidden || state.wakeLock) return;
+    try {
+      state.wakeLock = await navigator.wakeLock.request("screen");
+      state.wakeLock.addEventListener("release", () => { state.wakeLock = null; });
+    } catch {}
+  }
+
+  function startActiveReader(automatic = false) {
+    if (!state.config) return;
+    if (state.config.source === "qr") return startCamera(automatic);
+    if (state.config.source === "nfc" && !automatic) return startNfc();
+    if (state.config.source === "nfc") {
+      $(".reader-fallback").open = true;
+      $("#credentialInput").focus();
+    }
   }
 
   function updateNetwork() {
@@ -479,7 +506,26 @@
     } catch {}
   }
 
-  async function startCamera() {
+  async function detectQrFrame(video, nativeDetector) {
+    if (nativeDetector) {
+      const codes = await nativeDetector.detect(video);
+      return codes[0]?.rawValue || "";
+    }
+    const jsQR = window.WTS_VENDOR?.jsQR;
+    if (!jsQR || !video.videoWidth || !video.videoHeight) return "";
+    const canvas = $("#cameraCanvas"), maxWidth = 760;
+    const scale = Math.min(1, maxWidth / video.videoWidth);
+    canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+    canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const frame = context.getImageData(0, 0, canvas.width, canvas.height);
+    return jsQR(frame.data, frame.width, frame.height, { inversionAttempts: "attemptBoth" })?.data || "";
+  }
+
+  async function startCamera(automatic = false) {
+    if (state.cameraStream) return;
+    state.cameraPaused = false;
     if (!navigator.mediaDevices?.getUserMedia)
       return showResult(
         "error",
@@ -487,17 +533,28 @@
         "Camera scanner unavailable",
         "Use the credential input or a connected reader.",
       );
-    if (!("BarcodeDetector" in window))
+    if (!("BarcodeDetector" in window) && !window.WTS_VENDOR?.jsQR)
       return showResult(
         "error",
         "QR_NOT_SUPPORTED",
         "QR detection is unavailable",
-        "Use Chrome on Android, paste the QR token, or use the NFC reader input.",
+        "This browser cannot read QR codes. Use a current browser or a connected reader.",
       );
     try {
-      const detector = new BarcodeDetector({ formats: ["qr_code"] });
+      let detector = null;
+      if ("BarcodeDetector" in window) {
+        try {
+          detector = new BarcodeDetector({ formats: ["qr_code"] });
+        } catch {
+          detector = null;
+        }
+      }
       state.cameraStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" } },
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
         audio: false,
       });
       const video = $("#cameraVideo");
@@ -506,18 +563,35 @@
       $("#cameraBox").hidden = false;
       $("#tapZone").hidden = true;
       $("#startScan").hidden = true;
+      $("#cameraStatus").textContent = "Camera active · Show the QR side of the ID card";
+      requestWakeLock();
       let lastCheck = 0;
       const loop = async (timestamp) => {
         if (!state.cameraStream) return;
-        if (timestamp - lastCheck > 220) {
+        if (timestamp - lastCheck > 180) {
           lastCheck = timestamp;
           try {
-            const codes = await detector.detect(video);
-            if (codes[0]?.rawValue) {
-              const value = codes[0].rawValue;
-              stopCamera();
-              await submitCredential(value);
-              return;
+            const value = await detectQrFrame(video, detector);
+            if (value) {
+              state.cameraClearFrames = 0;
+              if (!state.cameraBusy && value !== state.lastCameraValue) {
+                state.cameraBusy = true;
+                state.lastCameraValue = value;
+                $("#cameraStatus").textContent = "Card found · Recording attendance…";
+                try {
+                  await submitCredential(value);
+                  $("#cameraStatus").textContent = "Ready for the next card · Remove this card first";
+                } finally {
+                  state.cameraBusy = false;
+                }
+              }
+            } else if (state.lastCameraValue) {
+              state.cameraClearFrames += 1;
+              if (state.cameraClearFrames >= 4) {
+                state.lastCameraValue = "";
+                state.cameraClearFrames = 0;
+                $("#cameraStatus").textContent = "Camera active · Show the QR side of the ID card";
+              }
             }
           } catch {}
         }
@@ -525,18 +599,19 @@
       };
       state.cameraLoop = requestAnimationFrame(loop);
     } catch (error) {
-      stopCamera();
+      stopCamera(false);
       showResult(
         "error",
         "CAMERA_PERMISSION",
         "Camera could not start",
-        error?.message || "Allow camera access and try again.",
+        automatic ? "Tap “Allow and start camera”, then approve camera access once." : error?.message || "Allow camera access and try again.",
       );
       beep(false);
     }
   }
 
-  function stopCamera() {
+  function stopCamera(manual = true) {
+    state.cameraPaused = manual;
     if (state.cameraLoop) cancelAnimationFrame(state.cameraLoop);
     state.cameraLoop = 0;
     if (state.cameraStream) {
@@ -548,6 +623,11 @@
       box.hidden = true;
       $("#tapZone").hidden = false;
       $("#startScan").hidden = false;
+      if (manual) {
+        $("#tapTitle").textContent = "Camera paused";
+        $("#tapHelp").textContent = "Tap below to start automatic scanning again.";
+        $("#startScan").textContent = "Resume automatic camera";
+      }
     }
   }
 
@@ -661,6 +741,7 @@
     setSource(state.config.source);
     $("#settingsDialog").close();
     toast("Scanner settings saved.", "success");
+    window.setTimeout(() => startActiveReader(true), 100);
   }
 
   function forgetDevice() {
@@ -706,23 +787,24 @@
         $$("[data-event]").forEach((item) =>
           item.classList.toggle("active", item === button),
         );
-        stopCamera();
       }),
   );
-  $("#startScan").onclick = () =>
-    state.config.source === "qr"
-      ? startCamera()
-      : state.config.source === "nfc"
-        ? startNfc()
-        : ($("#credentialInput").focus(), toast("Reader input is ready."));
+  $("#startScan").onclick = () => startActiveReader(false);
   $("#tapZone").onclick = $("#startScan").onclick;
-  $("#stopCamera").onclick = stopCamera;
+  $("#stopCamera").onclick = () => stopCamera(true);
   $("#readerForm").onsubmit = (event) => {
     event.preventDefault();
     submitCredential($("#credentialInput").value);
   };
   $("#openSettings").onclick = () => $("#settingsDialog").showModal();
   $("#saveSettings").onclick = saveSettings;
+  $("#installScanner").onclick = async () => {
+    if (!state.installPrompt) return;
+    state.installPrompt.prompt();
+    await state.installPrompt.userChoice.catch(() => null);
+    state.installPrompt = null;
+    $("#installScanner").hidden = true;
+  };
   $("#forgetDevice").onclick = forgetDevice;
   $("#syncQueue").onclick = syncQueue;
   $("#clearFailed").onclick = () => {
@@ -735,7 +817,16 @@
   window.addEventListener("online", updateNetwork);
   window.addEventListener("offline", updateNetwork);
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden) stopCamera();
+    if (document.hidden) stopCamera(false);
+    else {
+      requestWakeLock();
+      if (state.config?.source === "qr" && !state.cameraPaused) startCamera(true);
+    }
+  });
+  window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    state.installPrompt = event;
+    $("#installScanner").hidden = false;
   });
   if ("serviceWorker" in navigator)
     navigator.serviceWorker
