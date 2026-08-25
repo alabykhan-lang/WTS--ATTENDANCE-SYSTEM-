@@ -109,6 +109,7 @@ test("scanner opens as an always-ready camera with a bundled decoder fallback", 
   assert.match(source, /async function detectQrFrame/);
   assert.match(source, /WTS_VENDOR\?\.jsQR/);
   assert.match(source, /Remove this card first/);
+  assert.match(source, /Allow and start camera/);
   assert.match(vendorEntry, /import jsQR from "jsqr"/);
   assert.match(manifest, /scanner-icon\.svg/);
   assert.match(manifest, /"display": "standalone"/);

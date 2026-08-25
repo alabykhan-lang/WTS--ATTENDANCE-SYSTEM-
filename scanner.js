@@ -21,11 +21,13 @@
       "Automatic QR camera",
       "Camera permission needed",
       "Allow the camera once. It will stay ready and read each ID card automatically.",
+      "Allow and start camera",
     ],
     nfc: [
       "Tap an NFC card",
       "Start NFC reader",
       "Hold the written NFC card against the back of this phone.",
+      "Start NFC reader",
     ],
   };
   const friendly = {
@@ -231,7 +233,7 @@
     $("#scanTitle").textContent = copy[0];
     $("#tapTitle").textContent = copy[1];
     $("#tapHelp").textContent = copy[2];
-    $("#startScan").textContent = copy[1];
+    $("#startScan").textContent = copy[3] || copy[1];
     $("#scanIcon").textContent =
       source === "nfc" ? "◉" : source === "qr" ? "▣" : "▤";
     $("#credentialInput").placeholder =
