@@ -32,26 +32,26 @@
       <div class="brand"><span class="brand-mark">WTS</span><span><b>Attendance</b><small>QR + NFC</small></span></div>
       <nav aria-label="Primary attendance navigation">
         <small class="nav-label">WORKSPACE</small>
-        <button class="nav active" data-view="overview"><span>01</span>Today</button>
-        <button class="nav" data-view="scan"><span>02</span>Scan</button>
+        <button class="nav active" data-view="overview"><span>01</span>Home</button>
+        <button class="nav" data-view="scan"><span>02</span>Take Attendance</button>
         <button class="nav" data-view="credentials"><span>03</span>ID Cards</button>
-        <button class="nav" data-view="imports"><span>04</span>Sync</button>
-        <button class="nav" data-view="reports"><span>05</span>Reports</button>
-        <small class="nav-label admin-label">ADMINISTRATION</small>
-        <button class="nav nav-secondary" data-view="devices">Device setup</button>
-        <button class="nav nav-secondary" data-view="corrections">Exceptions</button>
-        <button class="nav nav-secondary" data-view="settings">Access & context</button>
+        <button class="nav" data-view="imports"><span>04</span>Bring In Records</button>
+        <button class="nav" data-view="reports"><span>05</span>View Reports</button>
+        <small class="nav-label admin-label">SCHOOL SETUP</small>
+        <button class="nav nav-secondary" data-view="devices">Set Up Devices</button>
+        <button class="nav nav-secondary" data-view="corrections">Fix a Record</button>
+        <button class="nav nav-secondary" data-view="settings">School Setup</button>
       </nav>
       <div class="connection"><i id="dot"></i><span id="connectionText">Central access required</span></div>
     </aside>
 
     <main>
       <header class="topbar">
-        <div><small class="eyebrow">WAY TO SUCCESS STANDARD SCHOOLS, EJIGBO</small><h1 id="title">Today</h1><p id="subtitle">A clear view of attendance as it happens.</p></div>
-        <div class="actions"><a class="ghost link-button" href="/scanner">Open scanner</a><button class="ghost" id="refresh">Refresh</button><button class="primary" id="login">Sign out</button></div>
+        <div><small class="eyebrow">WAY TO SUCCESS STANDARD SCHOOLS, EJIGBO</small><h1 id="title">Home</h1><p id="subtitle">Today's attendance in one place.</p></div>
+        <div class="actions"><a class="ghost link-button" href="/scanner">Take Attendance</a><button class="ghost" id="refresh">Refresh</button><button class="primary" id="login">Sign out</button></div>
       </header>
 
-      <div class="system-banner"><span class="banner-icon">2</span><div><b>Two trusted credentials. One attendance record.</b><span>QR passes and NFC cards are linked to Central Registry identities. Manual attendance is not part of this workflow.</span></div><span class="pill mint" id="contextPill">Checking context</span></div>
+      <div class="system-banner"><span class="banner-icon">2</span><div><b>Two simple ways to take attendance.</b><span>Scan the QR code on an ID card or tap its NFC card. Both belong to the same school record.</span></div><span class="pill mint" id="contextPill">Checking school period</span></div>
 
       <section class="view active" id="view-overview">
         <div class="section-head"><div><small class="eyebrow">TODAY</small><h2 id="todayHeading">Attendance at a glance</h2><p>Absence is derived from the expected roster and confirmed scans—it is never entered casually.</p></div><span class="date-label" id="today"></span></div>
@@ -84,24 +84,24 @@
       </section>
 
       <section class="view" id="view-credentials">
-        <div class="section-head"><div><small class="eyebrow">CENTRAL OFFICE</small><h2>ID cards & credentials</h2><p>Select an existing Central Registry student or staff member. The credential links to that identity; it never creates a duplicate person.</p></div></div>
+        <div class="section-head"><div><small class="eyebrow">SCHOOL OFFICE</small><h2>Prepare an ID card</h2><p>Find a student or staff member already in the school records, then create a QR code or link an NFC tap card.</p></div></div>
         <div class="credential-steps"><span class="active"><b>1</b>Find person</span><span><b>2</b>Issue QR or link NFC</span><span><b>3</b>Print and hand over</span></div>
-        <div class="two-column credential-layout"><article class="card"><div class="card-heading"><div><small class="eyebrow">CENTRAL REGISTRY</small><h2>Choose one person</h2></div></div><div class="toolbar compact-toolbar"><label class="grow">Search<input id="credentialSearch" placeholder="Name, admission or staff number"></label><label>People<select id="credentialPersonType"><option value="student">Students</option><option value="staff">Staff</option></select></label><button class="ghost" id="searchCredentials">Search</button></div><p class="small-note">QR cards may be generated here and printed immediately. NFC cards are linked one at a time so a physical card cannot be assigned to the wrong person.</p><div id="credentialPeople" class="people-list"></div></article>
+        <div class="two-column credential-layout"><article class="card"><div class="card-heading"><div><small class="eyebrow">SCHOOL RECORDS</small><h2>Find one person</h2></div></div><div class="toolbar compact-toolbar"><label class="grow">Name or number<input id="credentialSearch" placeholder="Type a name, admission number, or staff number"></label><label>Who<select id="credentialPersonType"><option value="student">Students</option><option value="staff">Staff</option></select></label><button class="ghost" id="searchCredentials">Find</button></div><p class="small-note">Create and print a QR code here. To link an NFC card, tap or read that physical card once.</p><div id="credentialPeople" class="people-list"></div></article>
           <article class="card detail-panel"><div id="credentialEmpty" class="empty">Choose a student or staff member to prepare an ID card.</div><div id="credentialDetail" hidden>
             <div class="person-heading"><div class="avatar" id="credentialAvatar">W</div><div><small class="eyebrow" id="credentialKind">CENTRAL REGISTRY</small><h2 id="credentialName"></h2><p id="credentialMeta"></p></div></div>
             <div class="credential-methods">
               <section class="credential-method"><div class="method-heading"><span>QR</span><div><b>Secure QR pass</b><small>Generate, preview and print on the WTS ID card.</small></div></div><div class="button-row"><button class="primary" id="issueQr">Generate QR pass</button><button class="ghost" id="printQr">Print last pass</button></div></section>
               <section class="credential-method"><div class="method-heading"><span>NFC</span><div><b>Link physical card</b><small>Tap or read the card once at the central office.</small></div></div><form id="credentialAssignForm" class="stack-form credential-form"><input id="credentialType" type="hidden" value="nfc_uid"><label>Card UID<input id="credentialRaw" autocomplete="off" required placeholder="Tap card or scan with USB NFC reader"></label><div class="form-grid"><label>Card label<input id="credentialLabel" placeholder="Main school ID card"></label><label>Issuing reader (optional)<select id="credentialDevice"><option value="">No reader selected</option></select></label></div><button class="primary" type="submit">Link NFC card</button></form></section>
             </div>
-            <div class="card-subheading"><h3>Credential history</h3><span class="muted">Raw credentials are never displayed again.</span></div><div id="credentialList" class="credential-list"></div>
+            <div class="card-subheading"><h3>QR codes and tap cards</h3><span class="muted">Secret values are not shown again.</span></div><div id="credentialList" class="credential-list"></div>
           </div></article></div>
       </section>
 
       <section class="view" id="view-imports">
-        <div class="section-head"><div><small class="eyebrow">SYNC</small><h2>Bring attendance into WTS</h2><p>Live scans arrive immediately. Offline scanners retry automatically. Hardware exports can be previewed and imported here.</p></div></div>
-        <div class="sync-paths"><article><span>LIVE</span><h3>Real-time</h3><p>QR and NFC scans post directly over Wi-Fi or mobile data.</p></article><article><span>QUEUE</span><h3>Offline retry</h3><p>The current scanner encrypts pending events and synchronises when connectivity returns.</p></article><article><span>FILE</span><h3>Device import</h3><p>Move an export by USB, Bluetooth or Wi-Fi, then upload CSV, Excel or text.</p></article></div>
-        <article class="card import-uploader"><div class="upload-drop"><div class="upload-icon">↑</div><div><h2>Upload a scanner or reader export</h2><p>Preview first. Unknown credentials are held for mapping and repeated files are blocked by checksum.</p></div><input id="importFile" type="file" accept=".csv,.xlsx,.xls,.txt,.tsv"></div><div class="form-grid import-options"><label>Registered device<select id="importDevice"><option value="">No device selected</option></select></label><label>File format<select id="importAdapter"><option value="generic_delimited">Delimited text</option><option value="generic_csv">CSV</option><option value="generic_xlsx">Excel XLSX</option></select></label><button class="primary" id="previewImport">Preview file</button></div><div id="importFileStatus" class="muted">No file selected.</div></article>
-        <article class="card import-preview" id="importPreview" hidden><div class="card-heading"><div><small class="eyebrow">DRY RUN</small><h2 id="importPreviewTitle">Preview</h2></div><div class="button-row"><button class="ghost" id="mapImportRow">Map selected unknown</button><button class="primary" id="confirmImport">Confirm accepted rows</button></div></div><div class="import-summary" id="importSummary"></div><div class="table-wrap"><table><thead><tr><th>Row</th><th>Identifier</th><th>Event time</th><th>Method</th><th>Match</th><th>Reason</th></tr></thead><tbody id="importRows"></tbody></table></div><p class="small-note">Unknown users are not discarded. Resolve them to an existing Central Registry identity before confirming.</p></article>
+        <div class="section-head"><div><small class="eyebrow">BRING IN RECORDS</small><h2>How attendance reaches WTS</h2><p>Most scans arrive automatically. Use the file box only when a scanner or card reader saves its records for later.</p></div></div>
+        <div class="sync-paths"><article><span>NOW</span><h3>While connected</h3><p>A QR scan or card tap appears immediately through Wi-Fi or mobile data.</p></article><article><span>LATER</span><h3>If internet stops</h3><p>The WTS scanner keeps the scans safely and sends them when internet returns.</p></article><article><span>FILE</span><h3>From another device</h3><p>Transfer the device's saved file by USB, Bluetooth, or Wi-Fi and choose it below.</p></article></div>
+        <article class="card import-uploader"><div class="upload-drop"><div class="upload-icon">↑</div><div><h2>Choose a file saved by a scanner or reader</h2><p>Nothing is added until you preview the file and confirm the matched people.</p></div><input id="importFile" type="file" accept=".csv,.xlsx,.xls,.txt,.tsv"></div><div class="form-grid import-options"><label>Which device made the file?<select id="importDevice"><option value="">Choose a device if known</option></select></label><label>Kind of file<select id="importAdapter"><option value="generic_delimited">Text file</option><option value="generic_csv">CSV file</option><option value="generic_xlsx">Excel file</option></select></label><button class="primary" id="previewImport">Check the file</button></div><div id="importFileStatus" class="muted">No file selected.</div></article>
+        <article class="card import-preview" id="importPreview" hidden><div class="card-heading"><div><small class="eyebrow">CHECK BEFORE SAVING</small><h2 id="importPreviewTitle">File preview</h2></div><div class="button-row"><button class="ghost" id="mapImportRow">Match an unknown person</button><button class="primary" id="confirmImport">Save matched records</button></div></div><div id="importSummary" class="import-summary"></div><div class="table-wrap"><table><thead><tr><th>Row</th><th>Card or device number</th><th>Time</th><th>How recorded</th><th>Person found?</th><th>Note</th></tr></thead><tbody id="importRows"></tbody></table></div><p class="small-note">An unknown card is held safely. Select its row and use “Match an unknown person” before saving.</p></article>
         <article class="card"><div class="card-heading"><div><small class="eyebrow">SYNC HISTORY</small><h2>Previous imports</h2></div><button class="text-button" id="refreshImports">Refresh</button></div><div id="importBatches" class="batch-list"></div></article>
       </section>
 
@@ -111,9 +111,9 @@
       </section>
 
       <section class="view" id="view-devices">
-        <div class="section-head"><div><small class="eyebrow">ADMINISTRATION</small><h2>Device setup</h2><p>Register only QR scanners and NFC-capable readers that the school actually owns.</p></div><button class="primary" id="addDevice">Register QR/NFC device</button></div>
-        <div id="deviceGrid" class="device-grid"></div><div class="empty card-empty" id="deviceEmpty">No physical device is registered. The secure web scanner can still use a phone camera or NFC.</div>
-        <article class="card"><div class="card-heading"><div><small class="eyebrow">SUPPORTED CONNECTIONS</small><h2>How devices deliver records</h2></div></div><div class="adapter-grid"><div><b>Wi-Fi / mobile data</b><span>Real-time scan confirmation</span></div><div><b>Offline queue</b><span>Encrypted automatic retry</span></div><div><b>USB / Bluetooth</b><span>NFC reader input or transferred export</span></div><div><b>CSV / XLSX / Text</b><span>Previewed device imports</span></div></div></article>
+        <div class="section-head"><div><small class="eyebrow">SCHOOL DEVICES</small><h2>Set up a scanner or card reader</h2><p>Add each school-owned phone, scanner, or NFC reader once. WTS creates its device code and secret for you.</p></div><button class="primary" id="addDevice">Add a device</button></div>
+        <div id="deviceGrid" class="device-grid"></div><div class="empty card-empty" id="deviceEmpty">No device has been added. You can still open Take Attendance on a phone and use its camera.</div>
+        <article class="card"><div class="card-heading"><div><small class="eyebrow">HOW RECORDS ARRIVE</small><h2>Choose what matches your device</h2></div></div><div class="adapter-grid"><div><b>Wi-Fi or mobile data</b><span>Scans appear immediately</span></div><div><b>Internet goes off</b><span>WTS saves scans until it returns</span></div><div><b>USB or Bluetooth</b><span>A card reader types the card number or transfers a file</span></div><div><b>A saved file</b><span>Check it before adding the records</span></div></div></article>
       </section>
 
       <section class="view" id="view-corrections">
@@ -122,7 +122,7 @@
       </section>
 
       <section class="view" id="view-settings">
-        <div class="section-head"><div><small class="eyebrow">ADMINISTRATION</small><h2>Access & school context</h2><p>Identity, classes and the active academic period remain owned by Central Registry.</p></div></div>
+        <div class="section-head"><div><small class="eyebrow">SCHOOL SETUP</small><h2>Your Attendance setup</h2><p>People, classes, and the current school period come from the main WTS school records.</p></div></div>
         <div class="two-column"><article class="card settings-card"><div class="card-heading"><div><small class="eyebrow">OFFICIAL CONTEXT</small><h2>Current school period</h2></div></div><dl id="contextDetails" class="definition-list"></dl></article><article class="card settings-card"><div class="card-heading"><div><small class="eyebrow">YOUR ACCESS</small><h2>Attendance responsibilities</h2></div></div><div id="roleDetails" class="role-list"></div></article></div>
         <article class="card settings-card"><div class="card-heading"><div><small class="eyebrow">CENTRAL REGISTRY ROSTER</small><h2>Identity synchronisation</h2></div><button class="ghost" id="retryRosterSync">Run safe re-sync</button></div><div id="rosterSyncDetails" class="definition-list"><div class="empty">Roster synchronisation status appears when this view opens.</div></div></article>
       </section>
@@ -130,6 +130,21 @@
   </div>
 
   <dialog id="secretDialog"><div class="secret-box id-print-sheet"><button class="dialog-close" id="closeSecret" aria-label="Close">×</button><div class="id-card-preview"><div class="id-card-brand"><b>WTS</b><span>WAY TO SUCCESS STANDARD SCHOOLS<small>Official school identity & attendance card</small></span></div><div class="id-card-person"><div class="avatar id-avatar" id="printAvatar">W</div><div><small id="printKind">STUDENT</small><h2 id="printName">WTS identity</h2><p id="printMeta">Central Registry</p></div></div><img id="qrPreview" class="qr-preview" alt="Secure attendance QR code" hidden><p class="id-card-note">Scan for attendance · If found, return to the school office</p></div><div class="secret-controls"><h2 id="secretTitle">One-time credential</h2><p id="secretIntro">Print this ID card now. The raw value is displayed only once.</p><pre id="secretValue"></pre><div class="dialog-actions"><button class="ghost" id="copySecret">Copy value</button><button class="ghost" id="printQrDialog">Print ID card</button><button class="primary" id="closeSecretButton">Done</button></div></div></div></dialog>
+
+  <dialog id="deviceDialog"><form id="deviceForm" class="setup-dialog">
+    <div class="dialog-heading"><div><small class="eyebrow">ADD A SCHOOL DEVICE</small><h2>What device are you setting up?</h2><p>WTS will create the device code and secret after you save.</p></div></div>
+    <label>Device name<input id="newDeviceName" required maxlength="100" placeholder="For example: Main Gate Phone"></label>
+    <label>Where will it be used?<input id="newDeviceLocation" maxlength="100" placeholder="For example: Main gate"></label>
+    <div class="form-grid"><label>What will it read?<select id="newDeviceMethod"><option value="both">QR codes and NFC cards</option><option value="qr">QR codes only</option><option value="nfc">NFC cards only</option></select></label><label>How will it connect?<select id="newDeviceConnection"><option value="wifi">Wi-Fi</option><option value="cellular">Mobile data</option><option value="usb">USB or Bluetooth reader</option><option value="mixed">More than one way</option><option value="offline">Saved file only</option></select></label></div>
+    <label class="check-row"><input id="newDeviceOffline" type="checkbox" checked><span><b>Keep scans if internet stops</b><small>They will be sent when the connection returns.</small></span></label>
+    <label>Device code WTS will use<input id="newDeviceCode" readonly></label>
+    <div class="dialog-actions"><button type="button" class="ghost" id="cancelDevice">Cancel</button><button class="primary" type="submit">Create device login</button></div>
+  </form></dialog>
+
+  <dialog id="deviceReadyDialog"><div class="setup-dialog device-ready"><small class="eyebrow">DEVICE LOGIN CREATED</small><h2>Use these two values on the device</h2><p>The code tells WTS which device is connecting. The secret is the device's password and is shown only now.</p><div class="device-login-value"><span>Device code</span><code id="readyDeviceCode"></code></div><div class="device-login-value"><span>Device secret</span><code id="readyDeviceSecret"></code></div><p class="notice-copy">Copy both values and paste them into the scanner setup screen on that phone, scanner, or reader.</p><div class="dialog-actions"><button class="ghost" id="copyDeviceLogin">Copy both</button><a class="ghost link-button" href="/scanner">Open scanner</a><button class="primary" id="closeDeviceReady">Done</button></div></div></dialog>
+
+  <dialog id="mapPersonDialog"><div class="setup-dialog"><small class="eyebrow">MATCH AN UNKNOWN CARD</small><h2>Who owns this card or device number?</h2><p>Number found in the file: <strong id="mapRowIdentifier"></strong></p><div class="compact-toolbar"><label>Who<select id="mapPersonType"><option value="student">Student</option><option value="staff">Staff</option></select></label><label class="grow">Name or school number<input id="mapPersonSearch" placeholder="Search school records"></label><button class="ghost" id="mapPersonSearchButton" type="button">Find</button></div><div id="mapPersonResults" class="people-list map-results"></div><div class="dialog-actions"><button class="ghost" id="closeMapPerson" type="button">Cancel</button></div></div></dialog>
+
   <dialog id="requiredPasswordDialog"><form method="dialog" id="requiredPasswordForm" class="auth-card password-dialog"><h2>Create your WTS password</h2><p>Your Central Registry account requires a password change before Attendance can open.</p><label>New password<div class="password-input-wrap"><input id="requiredPassword" type="password" autocomplete="new-password" minlength="10" maxlength="512" required><button class="password-toggle" type="button" data-password-toggle="requiredPassword">Show password</button></div></label><label>Confirm password<div class="password-input-wrap"><input id="requiredPasswordConfirm" type="password" autocomplete="new-password" minlength="10" maxlength="512" required><button class="password-toggle" type="button" data-password-toggle="requiredPasswordConfirm">Show password</button></div></label><div class="auth-error" id="requiredPasswordError" role="alert"></div><div class="dialog-actions"><button type="button" class="ghost" id="requiredPasswordCancel">Cancel</button><button class="primary" value="default">Save password</button></div></form></dialog>
   <div id="toasts" aria-live="polite"></div>
   <script src="/config.js"></script>

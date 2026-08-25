@@ -54,7 +54,7 @@ test("operator workspace exposes five focused areas and no manual marking screen
 
   assert.deepEqual(primary, ["overview", "scan", "credentials", "imports", "reports"]);
   assert.doesNotMatch(html, /Manual Marking|id="view-manual"|id="manualStaffForm"/);
-  assert.match(html, /Two trusted credentials\. One attendance record\./);
+  assert.match(html, /Two simple ways to take attendance\./);
 });
 
 test("credential office and scanner are restricted to QR and NFC", async () => {
@@ -73,10 +73,23 @@ test("credential office and scanner are restricted to QR and NFC", async () => {
   assert.doesNotMatch(appSource, /createManualEntry/);
 });
 
-test("sync centre documents real-time, encrypted offline retry, and file import", async () => {
+test("record intake explains connected, interrupted, and saved-file paths in plain language", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
-  assert.match(html, /Real-time/);
-  assert.match(html, /encrypts pending events/);
-  assert.match(html, /USB, Bluetooth or Wi-Fi/);
+  assert.match(html, /While connected/);
+  assert.match(html, /keeps the scans safely/);
+  assert.match(html, /USB, Bluetooth, or Wi-Fi/);
   assert.match(html, /\.csv,\.xlsx,\.xls,\.txt,\.tsv/);
+});
+
+test("ID-card search and device setup use the universal permission-scoped flow", async () => {
+  const [html, appSource] = await Promise.all([
+    readFile(new URL("../index.html", import.meta.url), "utf8"),
+    readFile(new URL("../app.js", import.meta.url), "utf8"),
+  ]);
+  assert.match(appSource, /universalRead\("people"/);
+  assert.doesNotMatch(appSource, /studentRead\("students"|staffRead\("staff"/);
+  assert.match(appSource, /universalWrite\("registerDevice"/);
+  assert.match(html, /id="deviceDialog"/);
+  assert.match(html, /id="readyDeviceCode"/);
+  assert.match(html, /id="readyDeviceSecret"/);
 });

@@ -12,6 +12,7 @@
     staff: [],
     selectedPerson: null,
     import: { batchId: null, rows: [], selectedRowId: null, file: null },
+    mapPeople: [],
     lastQr: null,
     lastQrPersonId: null,
     rosterSync: null,
@@ -63,7 +64,16 @@
     let data;
     try { data = await response.json(); } catch { throw new Error("Invalid Attendance server response."); }
     if (!response.ok || data?.ok === false) {
-      const error = new Error(data?.message || data?.code || "Attendance request failed.");
+      const friendlyErrors = {
+        ADMIN_PERMISSION_DENIED: "Your school account is not allowed to use this part of Attendance.",
+        ADMIN_REQUIRED: "Your school account is not allowed to use this part of Attendance.",
+        DEVICE_NAME_REQUIRED: "Give the device a clear name, such as Main Gate Phone.",
+        DEVICE_CODE_EXISTS: "That device code is already in use. Create a new code and try again.",
+        INVALID_DEVICE_METHOD: "Choose whether the device reads QR codes, NFC cards, or both.",
+        CREDENTIAL_ALREADY_ASSIGNED: "This card is already linked to somebody else.",
+        PERSON_TYPE_REQUIRED: "Choose Students or Staff before searching.",
+      };
+      const error = new Error(data?.message || friendlyErrors[data?.code] || "Attendance could not complete that request.");
       error.code = data?.code;
       throw error;
     }
@@ -72,9 +82,6 @@
 
   const universalRead = (action, payload = {}) => rpc("attendance_universal_admin_read_api", action, payload);
   const universalWrite = (action, payload = {}) => rpc("attendance_universal_admin_write_api", action, payload);
-  const studentRead = (action, payload = {}) => rpc("attendance_admin_read_api", action, payload);
-  const studentWrite = (action, payload = {}) => rpc("attendance_admin_write_api", action, payload);
-  const staffRead = (action, payload = {}) => rpc("staff_attendance_admin_read_api", action, payload);
   const controlsWrite = (action, payload = {}) => rpc("attendance_controls_admin_write_api", action, payload);
 
   function connected(value, message = "") {
@@ -133,14 +140,14 @@
 
   function setTitle(viewName) {
     const titles = {
-      overview: ["Today", "A clear view of attendance as it happens."],
-      scan: ["Scan", "One secure scanner for QR passes and NFC cards."],
-      credentials: ["ID Cards", "Issue QR passes and link NFC cards from the central office."],
-      devices: ["Device Setup", "Register only school-owned QR and NFC equipment."],
-      imports: ["Sync", "Real-time, offline retry, and device-file imports."],
-      corrections: ["Exceptions", "Review unusual cases without changing original events."],
-      reports: ["Attendance Reports", "Daily, weekly, monthly, term and session views."],
-      settings: ["Access & Context", "Central Registry identity, roles and school period."],
+      overview: ["Home", "Today's attendance in one place."],
+      scan: ["Take Attendance", "Scan a QR code or tap an NFC card."],
+      credentials: ["ID Cards", "Prepare a QR code or link a tap card for one person."],
+      devices: ["Set Up Devices", "Add a school phone, scanner, or card reader."],
+      imports: ["Bring In Records", "Receive scans now or upload records saved by a device."],
+      corrections: ["Fix a Record", "Review a record that needs correction."],
+      reports: ["View Reports", "See attendance for a day, week, month, term, or session."],
+      settings: ["School Setup", "See the school period and the Attendance areas you can use."],
     };
     const [title, subtitle] = titles[viewName] || titles.overview;
     $("#title").textContent = title;
@@ -163,7 +170,7 @@
       if (viewName === "settings") await renderSettings();
     } catch (error) {
       toast(error.message, "error");
-      if (["ADMIN_AUTH_FAILED", "ADMIN_SESSION_EXPIRED", "ADMIN_PERMISSION_DENIED", "RESULT_SESSION_NOT_ACTIVE", "RESULT_SESSION_REQUIRED", "ATTENDANCE_SESSION_REQUIRED", "CENTRAL_IDENTITY_NOT_ACTIVE"].includes(error.code)) void signOut();
+      if (["ADMIN_AUTH_FAILED", "ADMIN_SESSION_EXPIRED", "RESULT_SESSION_NOT_ACTIVE", "RESULT_SESSION_REQUIRED", "ATTENDANCE_SESSION_REQUIRED", "CENTRAL_IDENTITY_NOT_ACTIVE"].includes(error.code)) void signOut();
     }
   }
 
@@ -210,8 +217,13 @@
   async function loadCredentialPeople() {
     const type = $("#credentialPersonType").value;
     const search = $("#credentialSearch").value.trim();
-    const data = type === "student" ? await studentRead("students", { search }) : await staffRead("staff", { search });
-    const people = type === "student" ? (data.students || []).map((person) => ({ ...person, personType: "student", displayName: person.name, secondary: `${person.class_key || ""}${person.admno ? ` · ${person.admno}` : ""}` })) : (data.staff || []).map((person) => ({ ...person, personType: "staff", displayName: person.full_name, secondary: `${person.designation || person.staff_category || ""}${person.staff_number ? ` · ${person.staff_number}` : ""}` }));
+    const data = await universalRead("people", { personType: type, search });
+    const people = (data.people || []).map((person) => ({
+      ...person,
+      personType: person.person_type || type,
+      displayName: person.display_name,
+      secondary: `${person.group_name || ""}${person.reference ? ` · ${person.reference}` : ""}`,
+    }));
     if (type === "student") state.students = people; else state.staff = people;
     $("#credentialPeople").innerHTML = people.length ? people.map((person) => `<button class="person-item ${state.selectedPerson?.id === person.id ? "active" : ""}" data-person-id="${esc(person.id)}"><span class="avatar small-avatar">${avatarMarkup(person, "P")}</span><span><b>${esc(person.displayName)}</b><small>${esc(person.secondary || "")}</small></span><span>›</span></button>`).join("") : `<div class="empty">No live ${type === "student" ? "students" : "staff"} match that search.</div>`;
   }
@@ -223,7 +235,7 @@
     if (!state.selectedPerson) return;
     $("#credentialEmpty").hidden = true;
     $("#credentialDetail").hidden = false;
-    $("#credentialKind").textContent = type === "student" ? "PUPIL · CENTRAL REGISTRY" : "STAFF · CENTRAL REGISTRY";
+    $("#credentialKind").textContent = type === "student" ? "STUDENT · SCHOOL RECORD" : "STAFF · SCHOOL RECORD";
     $("#credentialName").textContent = state.selectedPerson.displayName;
     $("#credentialMeta").textContent = state.selectedPerson.secondary;
     $("#credentialAvatar").innerHTML = avatarMarkup(state.selectedPerson);
@@ -234,7 +246,10 @@
   }
 
   function renderCredentialList(credentials) {
-    $("#credentialList").innerHTML = credentials.length ? credentials.map((credential) => `<div class="credential-row"><div><b>${esc(cleanStatus(credential.credential_type))}</b><small>${esc(credential.credential_label || "Attendance credential")} · ending ${esc(credential.token_last4 || "----")}${credential.external_user_id ? ` · external ${esc(credential.external_user_id)}` : ""}</small></div><div><span class="badge ${statusClass(credential.status)}">${esc(cleanStatus(credential.status))}</span>${["active", "pending"].includes(credential.status) ? `<button class="mini-button" data-suspend-credential="${esc(credential.id)}">Suspend</button>` : ""}</div></div>`).join("") : `<div class="empty">No Attendance credential is assigned yet.</div>`;
+    $("#credentialList").innerHTML = credentials.length ? credentials.map((credential) => {
+      const method = String(credential.credential_type || "").includes("qr") ? "QR code" : String(credential.credential_type || "").includes("nfc") ? "NFC tap card" : "ID card";
+      return `<div class="credential-row"><div><b>${method}</b><small>${esc(credential.credential_label || "School ID card")} · ending ${esc(credential.token_last4 || "----")}</small></div><div><span class="badge ${statusClass(credential.status)}">${esc(cleanStatus(credential.status))}</span>${["active", "pending"].includes(credential.status) ? `<button class="mini-button" data-suspend-credential="${esc(credential.id)}">Stop using</button>` : ""}</div></div>`;
+    }).join("") : `<div class="empty">No QR code or tap card has been prepared yet.</div>`;
   }
 
   async function digest(value) {
@@ -247,10 +262,10 @@
     if (!state.selectedPerson) return toast("Select a real person first.", "error");
     const type = state.selectedPerson.personType;
     const payload = type === "student" ? { studentId: state.selectedPerson.id, credentialType: "qr", label: `${state.selectedPerson.displayName} secure QR` } : { staffId: state.selectedPerson.id, credentialType: "qr", label: `${state.selectedPerson.displayName} secure QR` };
-    const data = type === "student" ? await studentWrite("issueCredential", payload) : await rpc("staff_attendance_admin_write_api", "issueCredential", payload);
+    const data = await universalWrite("issueQr", payload);
     const raw = data.credential?.raw_token;
-    if (raw) await showSecret("Secure QR attendance token", raw, true);
-    toast("QR credential issued. The raw token is shown once.", "success");
+    if (raw) await showSecret("QR code ready", raw, true);
+    toast("QR code created. Print the ID card before closing the preview.", "success");
     await selectCredentialPerson(state.selectedPerson.id);
   }
 
@@ -281,23 +296,44 @@
     if (forCredential) setOptions("#credentialDevice", options, "No reader selected");
     setOptions("#importDevice", options, "No device selected");
     $("#deviceEmpty").style.display = state.devices.length ? "none" : "block";
-    $("#deviceGrid").innerHTML = state.devices.length ? state.devices.map((device) => `<article class="device-card"><div class="device-top"><div><small class="eyebrow">${esc(device.device_code)}</small><h3>${esc(device.device_name)}</h3></div><span class="badge ${statusClass(device.computed_status || device.status)}">${esc(cleanStatus(device.computed_status || device.status || "unknown"))}</span></div><div class="device-details"><div><span>Category</span><b>${esc(cleanStatus(device.device_type || "—"))}</b></div><div><span>Location</span><b>${esc(device.assigned_gate || device.location || "Unassigned")}</b></div><div><span>Connection</span><b>${esc(device.connection_type || "—")}</b></div><div><span>Sources</span><b>${esc((device.supported_sources || []).join(", ") || "—")}</b></div><div><span>Last sync</span><b>${esc(displayTime(device.last_sync_at))}</b></div><div><span>Health</span><b>${esc(cleanStatus(device.health_status || "unknown"))}</b></div></div></article>`).join("") : "";
+    $("#deviceGrid").innerHTML = state.devices.length ? state.devices.map((device) => {
+      const reads = (device.supported_sources || []).map((source) => source === "qr" ? "QR codes" : source === "nfc" ? "NFC cards" : source).join(" and ");
+      const connects = ({ wifi: "Wi-Fi", cellular: "mobile data", usb: "USB or Bluetooth", mixed: "more than one way", ethernet: "network cable", offline: "file transfer only" })[device.connection_type] || cleanStatus(device.connection_type);
+      const status = device.computed_status || device.status || "unknown";
+      return `<article class="device-card"><div class="device-top"><div><small class="eyebrow">DEVICE CODE · ${esc(device.device_code)}</small><h3>${esc(device.device_name)}</h3></div><span class="badge ${statusClass(status)}">${esc(cleanStatus(status))}</span></div><div class="device-details"><div><span>Reads</span><b>${esc(reads || "Not chosen")}</b></div><div><span>Used at</span><b>${esc(device.assigned_gate || device.location || "Not set")}</b></div><div><span>Connects by</span><b>${esc(connects || "Not set")}</b></div><div><span>If internet stops</span><b>${device.offline_enabled ? "Saves scans safely" : "Needs a connection"}</b></div><div><span>Last contact</span><b>${esc(displayTime(device.last_sync_at || device.last_seen_at))}</b></div><div><span>Device status</span><b>${esc(cleanStatus(device.health_status || "not checked yet"))}</b></div></div></article>`;
+    }).join("") : "";
   }
 
-  async function addDevice() {
-    const deviceCode = window.prompt("Unique code printed on or assigned to this school device:", "");
-    if (!deviceCode?.trim()) return;
-    const deviceName = window.prompt("Device name:", "");
-    if (!deviceName?.trim()) return;
-    const modality = (window.prompt("Credential method: qr, nfc, or both", "both") || "").trim().toLowerCase();
-    if (!['qr', 'nfc', 'both'].includes(modality)) return toast("Choose qr, nfc, or both.", "error");
-    const assignedGate = window.prompt("School location (for example Main gate):", "") || "";
-    const connectionType = (window.prompt("Connection: wifi, mobile, usb, bluetooth, or mixed", modality === "nfc" ? "usb" : "wifi") || "wifi").trim().toLowerCase();
-    const sources = modality === "both" ? ["qr", "nfc"] : [modality];
-    const deviceType = modality === "qr" ? "web_scanner" : modality === "nfc" ? "usb_hid_reader" : "android_scanner";
-    const result = await studentWrite("registerDevice", { deviceCode: deviceCode.trim(), deviceName: deviceName.trim(), deviceType, assignedGate, supportedSources: sources, connectionType, offlineEnabled: window.confirm("Should this device queue encrypted scans while offline?"), deploymentMode: "production" });
-    if (result.device?.raw_secret) await showSecret("Device credential", result.device.raw_secret, false);
-    toast("Real device registered. Store the device secret securely.", "success");
+  function createDeviceCode() {
+    const suffix = typeof crypto.randomUUID === "function" ? crypto.randomUUID().replaceAll("-", "").slice(0, 10) : [...crypto.getRandomValues(new Uint8Array(5))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    return `WTS-${suffix.toUpperCase()}`;
+  }
+
+  function openDeviceSetup() {
+    $("#deviceForm").reset();
+    $("#newDeviceCode").value = createDeviceCode();
+    $("#newDeviceMethod").value = "both";
+    $("#newDeviceConnection").value = "wifi";
+    $("#newDeviceOffline").checked = true;
+    $("#deviceDialog").showModal();
+  }
+
+  async function addDevice(event) {
+    event.preventDefault();
+    const result = await universalWrite("registerDevice", {
+      deviceCode: $("#newDeviceCode").value,
+      deviceName: $("#newDeviceName").value.trim(),
+      modality: $("#newDeviceMethod").value,
+      assignedGate: $("#newDeviceLocation").value.trim(),
+      connectionType: $("#newDeviceConnection").value,
+      offlineEnabled: $("#newDeviceOffline").checked,
+      deploymentMode: $("#newDeviceMethod").value === "qr" ? "mobile_admin" : "gate_fixed",
+    });
+    $("#deviceDialog").close();
+    $("#readyDeviceCode").textContent = result.device.device_code;
+    $("#readyDeviceSecret").textContent = result.device.raw_secret;
+    $("#deviceReadyDialog").showModal();
+    toast("Device login created.", "success");
     await loadDevices();
   }
 
@@ -395,18 +431,34 @@
     await loadImports();
   }
 
-  async function mapSelectedImportRow() {
+  async function loadMapPeople() {
+    const personType = $("#mapPersonType").value;
+    const search = $("#mapPersonSearch").value.trim();
+    const data = await universalRead("people", { personType, search });
+    state.mapPeople = data.people || [];
+    $("#mapPersonResults").innerHTML = state.mapPeople.length ? state.mapPeople.map((person) => `<button type="button" class="person-item" data-map-person-id="${esc(person.id)}"><span class="avatar small-avatar">${avatarMarkup(person, "P")}</span><span><b>${esc(person.display_name)}</b><small>${esc(person.group_name || "")}${person.reference ? ` · ${esc(person.reference)}` : ""}</small></span><span>Choose</span></button>`).join("") : `<div class="empty">No matching ${personType === "student" ? "students" : "staff"} found.</div>`;
+  }
+
+  async function openMapImportRow() {
     const row = state.import.rows.find((item) => String(item.id) === String(state.import.selectedRowId));
-    if (!row) return toast("Select an unknown import row first.", "error");
-    const personType = window.prompt("Person type: student or staff", "student");
-    if (!personType || !["student", "staff"].includes(personType.toLowerCase())) return;
-    const personId = window.prompt("Enter the exact Central Registry person ID for this real identity:", "");
-    if (!personId?.trim()) return;
-    await universalWrite("mapImportRow", { rowId: row.id, [personType.toLowerCase() === "student" ? "studentId" : "staffId"]: personId.trim(), credentialType: "nfc_uid", rawIdentifier: row.raw_identifier, externalUserId: row.external_user_id, deviceId: $("#importDevice").value || null });
+    if (!row || row.validation_status !== "unknown_identity") return toast("Choose a row marked Unknown person first.", "error");
+    $("#mapRowIdentifier").textContent = row.raw_identifier || row.external_user_id || "Unknown card";
+    $("#mapPersonType").value = "student";
+    $("#mapPersonSearch").value = "";
+    $("#mapPersonDialog").showModal();
+    await loadMapPeople();
+  }
+
+  async function mapSelectedImportRow(personId) {
+    const row = state.import.rows.find((item) => String(item.id) === String(state.import.selectedRowId));
+    const personType = $("#mapPersonType").value;
+    if (!row) return;
+    await universalWrite("mapImportRow", { rowId: row.id, [personType === "student" ? "studentId" : "staffId"]: personId, credentialType: "external_device_user_id", rawIdentifier: row.raw_identifier, externalUserId: row.external_user_id, deviceId: $("#importDevice").value || null });
     const refreshed = await universalRead("import_rows", { batchId: state.import.batchId });
     state.import.rows = refreshed.rows || [];
     renderImportPreview();
-    toast("Unknown row mapped to the selected real identity.", "success");
+    $("#mapPersonDialog").close();
+    toast("The unknown card is now matched to that person.", "success");
   }
 
   async function confirmImport() {
@@ -471,9 +523,27 @@
 
   async function renderSettings() {
     const config = state.context?.config || {};
-    $("#contextDetails").innerHTML = `<div><dt>Academic session</dt><dd>${esc(state.context?.session || config.operational_session || "—")}</dd></div><div><dt>Academic term</dt><dd>${esc(state.context?.term || config.operational_term || "—")}</dd></div><div><dt>Configuration source</dt><dd>Central Registry promotion context</dd></div><div><dt>Operator methods</dt><dd>QR pass and NFC card</dd></div><div><dt>Absence</dt><dd>Derived from expected roster and confirmed events</dd></div><div><dt>Parent notifications</dt><dd>${config.parent_notifications_enabled ? "Enabled by approved contract" : "Not enabled"}</dd></div>`;
+    $("#contextDetails").innerHTML = `<div><dt>School session</dt><dd>${esc(state.context?.session || config.operational_session || "—")}</dd></div><div><dt>Term</dt><dd>${esc(state.context?.term || config.operational_term || "—")}</dd></div><div><dt>People and classes</dt><dd>Come from the main school records</dd></div><div><dt>Ways to record attendance</dt><dd>Scan a QR code or tap an NFC card</dd></div><div><dt>Not present</dt><dd>Calculated from the expected class list and recorded scans</dd></div><div><dt>Parent messages</dt><dd>${config.parent_notifications_enabled ? "Turned on" : "Not turned on"}</dd></div>`;
     const permissions = state.context?.permissions || [];
-    $("#roleDetails").innerHTML = permissions.length ? permissions.map((item) => `<span class="permission-chip">${esc(item)}</span>`).join("") : `<div class="empty">No Attendance actions were granted.</div>`;
+    const accessLabels = {
+      "*": "All Attendance areas",
+      "dashboard.read": "See today's attendance",
+      "class.attendance.read": "See class attendance",
+      "class.attendance.write": "Work with class attendance",
+      "attendance.register.confirm": "Confirm class attendance",
+      "staff.read": "See staff attendance",
+      "reports.read": "View reports",
+      "credentials.manage": "Prepare ID cards",
+      "devices.read": "See school devices",
+      "devices.manage": "Set up school devices",
+      "imports.read": "See uploaded records",
+      "imports.manage": "Bring in device records",
+      "corrections.create": "Ask for a record correction",
+      "corrections.review": "Approve record corrections",
+      "settings.manage": "Manage Attendance setup",
+    };
+    const friendlyAccess = [...new Set(permissions.map((item) => accessLabels[item]).filter(Boolean))];
+    $("#roleDetails").innerHTML = friendlyAccess.length ? friendlyAccess.map((item) => `<span class="permission-chip">${esc(item)}</span>`).join("") : `<div class="empty">No Attendance areas are assigned to this account.</div>`;
     await loadRosterSyncStatus();
   }
 
@@ -495,6 +565,7 @@
 
   async function showSecret(title, value, makeQr = false) {
     $("#secretTitle").textContent = title;
+    $("#secretIntro").textContent = makeQr ? "Print this ID card now. For safety, the QR value is shown only this time." : "Keep this value safe. It is shown only once.";
     $("#secretValue").textContent = value;
     $("#qrPreview").hidden = !makeQr;
     $("#printQrDialog").hidden = !makeQr;
@@ -524,6 +595,8 @@
       if (go) openView(go.dataset.go);
       const person = event.target.closest("[data-person-id]");
       if (person) selectCredentialPerson(person.dataset.personId).catch((error) => toast(error.message, "error"));
+      const mapPerson = event.target.closest("[data-map-person-id]");
+      if (mapPerson) mapSelectedImportRow(mapPerson.dataset.mapPersonId).catch((error) => toast(error.message, "error"));
       const credential = event.target.closest("[data-suspend-credential]");
       if (credential) universalWrite("suspendCredential", { credentialId: credential.dataset.suspendCredential, reason: window.prompt("Reason for suspension:", "Lost, damaged or replaced") || "Credential suspended" }).then(() => { toast("Credential suspended.", "success"); return selectCredentialPerson(state.selectedPerson.id); }).catch((error) => toast(error.message, "error"));
       if (event.target.closest("[data-review]")) reviewCorrection(event).catch((error) => toast(error.message, "error"));
@@ -538,11 +611,19 @@
     $("#credentialSearch").onkeydown = (event) => { if (event.key === "Enter") loadCredentialPeople().catch((error) => toast(error.message, "error")); };
     $("#issueQr").onclick = () => issueQr().catch((error) => toast(error.message, "error"));
     $("#credentialAssignForm").onsubmit = (event) => assignCredential(event).catch((error) => toast(error.message, "error"));
-    $("#printQr").onclick = () => state.lastQr && state.lastQrPersonId === state.selectedPerson?.id ? showSecret("Secure QR attendance token", state.lastQr, true) : toast("Generate this person's QR pass before printing.", "error");
-    $("#addDevice").onclick = () => addDevice().catch((error) => toast(error.message, "error"));
+    $("#printQr").onclick = () => state.lastQr && state.lastQrPersonId === state.selectedPerson?.id ? showSecret("QR code ready", state.lastQr, true) : toast("Create this person's QR code before printing.", "error");
+    $("#addDevice").onclick = openDeviceSetup;
+    $("#deviceForm").onsubmit = (event) => addDevice(event).catch((error) => toast(error.message, "error"));
+    $("#cancelDevice").onclick = () => $("#deviceDialog").close();
+    $("#closeDeviceReady").onclick = () => $("#deviceReadyDialog").close();
+    $("#copyDeviceLogin").onclick = () => navigator.clipboard?.writeText(`Device code: ${$("#readyDeviceCode").textContent}\nDevice secret: ${$("#readyDeviceSecret").textContent}`).then(() => toast("Device code and secret copied.", "success"));
     $("#importFile").onchange = () => { const file = $("#importFile").files?.[0]; $("#importFileStatus").textContent = file ? `${file.name} selected. Preview before processing.` : "No file selected."; };
     $("#previewImport").onclick = () => previewImport().catch((error) => toast(error.message, "error"));
-    $("#mapImportRow").onclick = () => mapSelectedImportRow().catch((error) => toast(error.message, "error"));
+    $("#mapImportRow").onclick = () => openMapImportRow().catch((error) => toast(error.message, "error"));
+    $("#mapPersonSearchButton").onclick = () => loadMapPeople().catch((error) => toast(error.message, "error"));
+    $("#mapPersonType").onchange = () => loadMapPeople().catch((error) => toast(error.message, "error"));
+    $("#mapPersonSearch").onkeydown = (event) => { if (event.key === "Enter") { event.preventDefault(); loadMapPeople().catch((error) => toast(error.message, "error")); } };
+    $("#closeMapPerson").onclick = () => $("#mapPersonDialog").close();
     $("#confirmImport").onclick = () => confirmImport().catch((error) => toast(error.message, "error"));
     $("#refreshImports").onclick = () => loadImports().catch((error) => toast(error.message, "error"));
     $("#refreshCorrections").onclick = () => loadCorrections().catch((error) => toast(error.message, "error"));
