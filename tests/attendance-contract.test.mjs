@@ -107,6 +107,10 @@ test("scanner opens as an always-ready camera with a bundled decoder fallback", 
   assert.match(html, /Keep this page open\. The next card will be read automatically\./);
   assert.match(source, /startActiveReader\(true\)/);
   assert.match(source, /async function detectQrFrame/);
+  assert.match(source, /decodeQrRegion/);
+  assert.match(source, /focusWidth/);
+  assert.match(source, /tuneCameraTrack/);
+  assert.match(source, /zoom/);
   assert.match(source, /nativeDetector\.detect\(video\)/);
   assert.match(source, /if \(value\) return value;/);
   assert.match(source, /maxWidth = 960/);
