@@ -29,7 +29,7 @@
 .school-crest{overflow:hidden;background:#fff;border:2px solid rgba(255,255,255,.88);color:transparent}
 
 
-/* Permanent, print-safe WTS ID cards */
+/* Portrait WTS ID-card templates and print surface */
 .card-bulk-tools{margin:18px 0;padding:20px 22px;border-color:#cfe9dd;background:linear-gradient(135deg,#f7fcfa 0%,#fff 70%)}
 .card-bulk-tools .card-heading{align-items:flex-start}
 .card-bulk-tools .card-heading h2{margin-bottom:4px}
@@ -42,63 +42,58 @@
 .card-bulk-tools .badge{margin-top:1px}
 
 .id-print-sheet{width:min(1220px,calc(100vw - 24px));grid-template-columns:minmax(0,1fr) 250px;gap:24px;padding:24px;text-align:left}
-.id-card-print-area{display:grid;gap:18px;min-width:0}
-.id-card-print-area .id-card-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start;min-width:0}
-.id-card-face{position:relative;width:100%;aspect-ratio:85.6/53.98;border-radius:16px;overflow:hidden;box-shadow:0 12px 32px rgba(5,29,52,.18)}
+.id-card-print-area{display:grid;gap:24px;min-width:0}
+.id-card-print-area .id-card-pair{display:grid;grid-template-columns:repeat(2,minmax(210px,1fr));gap:18px;align-items:start;min-width:0}
+.id-card-face{position:relative;width:100%;aspect-ratio:53.98/85.6;border-radius:20px;overflow:hidden;box-shadow:0 14px 34px rgba(5,29,52,.18);print-color-adjust:exact;-webkit-print-color-adjust:exact}
 .id-side-wrap{display:grid;gap:7px;min-width:0}
 .id-side-label{color:#718397;font-size:9px;font-weight:900;letter-spacing:.12em}
-.id-card-front{padding:17px 19px 13px;background:linear-gradient(145deg,#fff 0 65%,#edf8f3 65%);color:#132c46;border:1px solid #dfe8ed}
-.id-card-front:before{content:"";position:absolute;left:0;top:0;bottom:0;width:8px;background:linear-gradient(#0b1f3a 0 70%,#d6a84f 70%)}
-.id-card-front:after{content:"";position:absolute;width:160px;height:160px;border-radius:50%;right:-86px;bottom:-111px;border:21px solid rgba(20,112,92,.09)}
-.id-card-front .id-card-brand{position:relative;z-index:1;display:flex;align-items:center;gap:9px;padding:0 0 9px;border-bottom:1px solid #dce6eb}
-.id-card-front .school-crest{width:37px;height:37px;border-radius:11px;border:2px solid #fff}
-.id-card-brand>span{color:#0b1f3a;font-size:9px;font-weight:950;letter-spacing:.045em;line-height:1.2}
-.id-card-brand small{display:block;color:#668096;font-size:6px;margin-top:3px;letter-spacing:.1em}
-.id-card-type{margin-left:auto;padding:5px 7px;border-radius:999px;background:#dff6eb;color:#176b55;font-size:6px;font-style:normal;font-weight:950;letter-spacing:.1em;white-space:nowrap}
-.id-front-body{position:relative;z-index:1;display:grid;grid-template-columns:68px 1fr;gap:12px;align-items:center;margin:12px 0 10px}
-.id-card-front .id-avatar{width:68px;height:77px;border-radius:9px;background:#e3f3ec;color:#176854;font-size:22px;border:3px solid #fff;box-shadow:0 4px 14px rgba(11,31,58,.16)}
-.id-person-copy{min-width:0}
-.id-person-copy>small{display:inline-flex;padding:4px 6px;border-radius:999px;background:#0f6c59;color:#fff;font-size:6px;font-weight:950;letter-spacing:.12em}
-.id-person-copy h2{margin:6px 0 3px;color:#0b1f3a;font-size:17px;line-height:1.05;overflow-wrap:anywhere}
-.id-person-copy p{margin:0;color:#617589;font-size:7px;font-weight:700}
-.id-fields{position:relative;z-index:1;display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin:0}
-.id-fields>div{min-width:0;padding-top:6px;border-top:1px solid #dce5eb}
-.id-fields dt{color:#718397;font-size:5.5px;font-weight:900;letter-spacing:.08em}
-.id-fields dd{margin:2px 0 0;color:#152f4b;font-size:7px;font-weight:900;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.id-card-front footer{position:absolute;z-index:1;left:19px;right:17px;bottom:7px;display:flex;align-items:center;justify-content:space-between;color:#6e7f8f;font-size:5.5px}
-.id-card-front footer b{color:#0f6c59;font-size:7px}
-.staff-card-front{background:linear-gradient(145deg,#0b1f3a 0 42%,#123f55 42% 100%);color:#fff;border-color:#123f55}
-.staff-card-front:before{background:linear-gradient(#d6a84f 0 70%,#79d4bb 70%)}
-.staff-card-front:after{border-color:rgba(255,255,255,.1)}
-.staff-card-front .id-card-brand{border-color:rgba(255,255,255,.2)}
-.staff-card-front .id-card-brand>span{color:#fff}
-.staff-card-front .id-card-brand small{color:#a8cec9}
-.staff-card-front .id-card-type{background:#f4d47d;color:#0b1f3a}
-.staff-card-front .id-person-copy>small{background:#f4d47d;color:#0b1f3a}
-.staff-card-front .id-person-copy h2{color:#fff}
-.staff-card-front .id-person-copy p{color:#c2d4df}
-.staff-card-front .id-avatar{background:#e5edf4;color:#284f70}
-.staff-card-front .id-fields>div{border-color:rgba(255,255,255,.2)}
-.staff-card-front .id-fields dt{color:#9db9c9}
-.staff-card-front .id-fields dd{color:#fff}
-.staff-card-front footer{color:#aac1ce}
-.staff-card-front footer b{color:#f4d47d}
+.id-card-front,.id-card-back{position:relative}
+.id-card-front{color:#0b1f3a;background:#fff}
+.id-card-front .vertical-card-brand{position:absolute;z-index:4;top:5%;left:8%;right:8%;display:flex;align-items:center;gap:8px;color:#fff;text-align:left}
+.vertical-card-brand .school-crest,.vertical-back-brand .school-crest{display:grid;place-items:center;flex:0 0 auto;width:34px;height:34px;border-radius:50%;overflow:hidden;background:#fff;border:3px solid rgba(255,255,255,.85);box-shadow:0 4px 12px rgba(0,0,0,.14)}
+.vertical-card-brand .school-crest img,.vertical-back-brand .school-crest img{display:block;width:100%;height:100%;object-fit:cover}
+.vertical-card-brand>span,.vertical-back-brand>span{display:grid;gap:3px;min-width:0;font-size:8px;font-weight:950;letter-spacing:.04em;line-height:1.15}
+.vertical-card-brand small,.vertical-back-brand small{display:block;color:rgba(255,255,255,.78);font-size:5px;letter-spacing:.1em}
+.staff-card-front{background:linear-gradient(180deg,#2d3c7b 0 58%,#fff 58%);color:#0b1f3a}
+.staff-card-front:before{content:"";position:absolute;z-index:1;left:-12%;right:-12%;top:49%;height:18%;background:#fff;border-radius:50% 50% 0 0/100% 100% 0 0;transform:rotate(-3deg)}
+.staff-card-front:after{content:"";position:absolute;z-index:1;left:-14%;right:-14%;top:56%;height:7%;background:#dfe5ff;border-radius:50% 50% 0 0/100% 100% 0 0;opacity:.85}
+.student-card-front{background:#fff;color:#0b1f3a}
+.student-card-front:before{content:"";position:absolute;z-index:1;left:0;right:0;top:0;height:57%;background:#07998d;clip-path:polygon(0 0,100% 0,100% 84%,70% 91%,42% 95%,0 100%)}
+.student-card-front:after{content:"";position:absolute;z-index:1;left:-15%;right:-15%;top:51%;height:13%;background:#c9f0e5;border-radius:50% 50% 0 0/100% 100% 0 0;transform:rotate(-4deg)}
+.student-card-front .vertical-card-brand{color:#fff}
+.vertical-card-portrait{position:absolute;z-index:3;left:50%;top:31%;width:61%;aspect-ratio:1;transform:translateX(-50%);border-radius:50%;background:#f1f5f6;border:5px solid #fff;box-shadow:0 8px 20px rgba(11,31,58,.22);overflow:hidden}
+.vertical-card-portrait .id-avatar{display:grid;place-items:center;width:100%;height:100%;border-radius:50%;overflow:hidden;color:#2d3c7b;background:#eef4f8;font-size:28px;font-weight:950}
+.vertical-card-portrait .id-avatar img{display:block;width:100%;height:100%;object-fit:cover}
+.student-portrait{top:31%;border-color:#fff;box-shadow:0 8px 20px rgba(0,90,81,.18)}
+.staff-card-info,.student-card-info{position:absolute;z-index:4;left:8%;right:8%;top:61%;text-align:center}
+.vertical-card-info h2{margin:0;color:#0b1f3a;font-size:18px;font-weight:950;line-height:1.06;overflow-wrap:anywhere}
+.staff-card-info h2{font-size:17px}
+.vertical-card-subtitle,.vertical-card-role{margin:7px 0 13px;color:#283876;font-size:10px;font-weight:700;letter-spacing:.03em}
+.student-card-info .vertical-card-subtitle{color:#087d72}
+.vertical-card-role{color:#293979;margin-bottom:12px}
+.vertical-card-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0;text-align:left}
+.student-card-info .vertical-card-fields{grid-template-columns:repeat(3,minmax(0,1fr));text-align:center;gap:5px}
+.vertical-card-fields>div{min-width:0;padding-top:7px;border-top:1px solid #d9e0e7}
+.vertical-card-fields dt{color:#718397;font-size:5px;font-weight:900;letter-spacing:.08em;white-space:nowrap}
+.vertical-card-fields dd{margin:3px 0 0;color:#152f4b;font-size:7px;font-weight:900;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vertical-card-footer{position:absolute;z-index:4;left:8%;right:8%;bottom:4%;display:flex;align-items:center;justify-content:space-between;color:#687b8d;font-size:5px;font-weight:800;letter-spacing:.08em}
+.vertical-card-footer b{color:#293979;font-size:6px;letter-spacing:.03em}
+.staff-card-front .vertical-card-brand>span,.staff-card-front .vertical-card-brand small{color:#fff}
+.student-card-front .vertical-card-brand>span,.student-card-front .vertical-card-brand small{color:#fff}
 
-.id-card-back{display:grid;grid-template-rows:auto auto 1fr auto;gap:4px;align-items:center;padding:10px 14px 8px;background:linear-gradient(180deg,#0b1f3a 0 27%,#fff 27%);color:#0b1f3a;border:1px solid #cfdce4}
-.id-back-brand{width:100%;display:flex;align-items:center;gap:8px;color:#fff;font-size:8px;font-weight:950;letter-spacing:.06em}
-.id-back-brand .school-crest{width:29px;height:29px;border-radius:9px;border:2px solid rgba(255,255,255,.9)}
-.id-back-brand>span{display:grid;gap:2px;line-height:1.1}
-.id-back-brand>span small{color:#b8d8d0;font-size:5.5px;letter-spacing:.12em}
-.id-back-kind{margin-left:auto;color:#f4d47d;font-size:5.5px;font-style:normal;font-weight:950;letter-spacing:.1em}
-.id-back-copy{text-align:center;margin:3px 0 0}
-.id-back-copy small{color:#16705b;font-size:6px;font-weight:950;letter-spacing:.14em}
-.id-back-copy h2{margin:1px 0 0;color:#0b1f3a;font-size:10px;letter-spacing:.06em}
-.id-card-back .qr-frame{width:min(64%,220px);aspect-ratio:1;display:grid;place-items:center;margin:0 auto;padding:5px;background:#fff;border:1px solid #edf1f3}
-.id-card-back .qr-preview{display:block;width:100%;height:100%;max-width:none;margin:0;border:0;box-shadow:none;background:#fff;image-rendering:pixelated;object-fit:contain}
-.id-qr-hint{margin:0;color:#687b8d;font-size:5.5px;font-weight:800;letter-spacing:.08em;text-align:center}
-.id-print-sheet>.secret-controls{align-self:center}
-.id-print-sheet>.secret-controls h2{font-size:21px}
-.id-print-sheet>.secret-controls p{line-height:1.5}
+.id-card-back{padding:0;background:#fff;color:#0b1f3a;border:1px solid #cfdce4}
+.staff-card-back{background:linear-gradient(180deg,#2d3c7b 0 24%,#fff 24%)}
+.student-card-back{background:linear-gradient(180deg,#07998d 0 24%,#fff 24%)}
+.vertical-back-brand{position:absolute;z-index:3;top:5%;left:8%;right:8%;display:flex;align-items:center;gap:8px;color:#fff;text-align:left}
+.vertical-back-brand .school-crest{width:29px;height:29px;border-width:2px}
+.vertical-back-brand>span{font-size:8px}
+.vertical-back-brand>span small{font-size:5px;color:rgba(255,255,255,.82)}
+.vertical-qr-copy{position:absolute;z-index:3;top:25%;left:7%;right:7%;text-align:center}
+.vertical-qr-copy small{color:#16705b;font-size:6px;font-weight:950;letter-spacing:.14em}
+.vertical-qr-copy h2{margin:3px 0 0;color:#0b1f3a;font-size:9px;letter-spacing:.06em;line-height:1.15}
+.id-card-back .qr-frame{position:absolute;z-index:2;left:5%;right:5%;top:31%;bottom:9%;display:grid;place-items:center;aspect-ratio:1;margin:0 auto;padding:6px;background:#fff;border:1px solid #e7edf0}
+.id-card-back .qr-preview{display:block;width:100%;height:100%;max-width:none;margin:0;background:#fff;image-rendering:pixelated;object-fit:contain}
+.id-qr-hint{position:absolute;z-index:3;left:0;right:0;bottom:3.5%;margin:0;color:#687b8d;font-size:5px;font-weight:850;letter-spacing:.08em;text-align:center}
 
 @media(max-width:1060px){
   .id-print-sheet{grid-template-columns:1fr;max-height:calc(100vh - 24px);overflow:auto}
@@ -112,41 +107,40 @@
   .bulk-card-toolbar .button-row>*{width:100%}
 }
 @media print{
-  @page{margin:10mm}
+  @page{size:A4 portrait;margin:8mm}
   .print-qr #secretDialog{width:auto!important}
   .print-qr .id-print-sheet{width:auto;display:block;padding:0;background:#fff}
   .print-qr .id-card-print-area{display:block}
-  .print-qr .id-card-print-area .id-card-pair{display:grid;grid-template-columns:85.6mm 85.6mm;gap:10mm;margin:0 0 7mm;break-inside:avoid;page-break-inside:avoid}
-  .print-qr .id-side-wrap{gap:1.3mm}
-  .print-qr .id-card-face{width:85.6mm;height:53.98mm;aspect-ratio:auto;border-radius:2.4mm;box-shadow:none;break-inside:avoid}
-  .print-qr .id-side-label{font-size:6.5pt}
-  .print-qr .id-card-front{padding:3.4mm 4.2mm 2.8mm}
-  .print-qr .id-card-front .school-crest{width:8.2mm;height:8.2mm;border-radius:2mm}
-  .print-qr .id-card-brand{gap:2mm;padding-bottom:1.8mm}
-  .print-qr .id-card-brand>span{font-size:7.2pt}
-  .print-qr .id-card-brand small{font-size:4.2pt;margin-top:.7mm}
-  .print-qr .id-card-type{padding:1.1mm 1.4mm;font-size:4.2pt}
-  .print-qr .id-front-body{grid-template-columns:17.5mm 1fr;gap:2.7mm;margin:2.6mm 0 2.2mm}
-  .print-qr .id-card-front .id-avatar{width:17.5mm;height:19.5mm;border-radius:1.8mm}
-  .print-qr .id-person-copy>small{padding:.8mm 1.2mm;font-size:4.1pt}
-  .print-qr .id-person-copy h2{margin:1.1mm 0 .6mm;font-size:10.6pt}
-  .print-qr .id-person-copy p{font-size:4.5pt}
-  .print-qr .id-fields{gap:1.7mm}
-  .print-qr .id-fields>div{padding-top:1.3mm}
-  .print-qr .id-fields dt{font-size:3.8pt}
-  .print-qr .id-fields dd{margin-top:.35mm;font-size:4.8pt}
-  .print-qr .id-card-front footer{left:4.2mm;right:3.7mm;bottom:1.5mm;font-size:3.8pt}
-  .print-qr .id-card-front footer b{font-size:5pt}
-  .print-qr .id-card-back{padding:2mm 4mm 2mm;grid-template-rows:6.5mm 3.5mm 36mm 2mm;gap:.4mm}
-  .print-qr .id-back-brand{gap:1.8mm;font-size:5.4pt}
-  .print-qr .id-back-brand .school-crest{width:6.2mm;height:6.2mm;border-radius:1.4mm}
-  .print-qr .id-back-brand>span small{font-size:3.8pt}
-  .print-qr .id-back-kind{font-size:3.8pt}
-  .print-qr .id-back-copy{margin:0}
-  .print-qr .id-back-copy small{font-size:3.8pt}
-  .print-qr .id-back-copy h2{font-size:6.7pt}
-  .print-qr .id-card-back .qr-frame{width:38mm;height:38mm;padding:1mm;border:0}
-  .print-qr .id-card-back .qr-preview{width:36mm;height:36mm;max-width:none;margin:0}
-  .print-qr .id-qr-hint{font-size:3.5pt}
+  .print-qr .id-card-print-area .id-card-pair{display:grid;grid-template-columns:53.98mm 53.98mm;gap:8mm;margin:0 0 8mm;break-inside:avoid;page-break-inside:avoid}
+  .print-qr .id-side-wrap{display:block;gap:0}
+  .print-qr .id-side-label{display:none}
+  .print-qr .id-card-face{width:53.98mm;height:85.6mm;aspect-ratio:auto;border-radius:2.5mm;box-shadow:none;break-inside:avoid;page-break-inside:avoid}
+  .print-qr .vertical-card-brand{top:5%;left:8%;right:8%;gap:2mm}
+  .print-qr .vertical-card-brand .school-crest{width:8.5mm;height:8.5mm;border-width:.7mm}
+  .print-qr .vertical-card-brand>span{font-size:6.2pt}
+  .print-qr .vertical-card-brand small{font-size:3.6pt}
+  .print-qr .vertical-card-portrait{width:61%;border-width:1.3mm;box-shadow:0 2mm 5mm rgba(11,31,58,.22)}
+  .print-qr .staff-card-info,.print-qr .student-card-info{left:8%;right:8%;top:61%}
+  .print-qr .vertical-card-info h2{font-size:11pt}
+  .print-qr .staff-card-info h2{font-size:10.5pt}
+  .print-qr .vertical-card-subtitle,.print-qr .vertical-card-role{margin:1.8mm 0 3.4mm;font-size:6pt}
+  .print-qr .vertical-card-fields{gap:1.5mm}
+  .print-qr .student-card-info .vertical-card-fields{gap:1mm}
+  .print-qr .vertical-card-fields>div{padding-top:1.8mm}
+  .print-qr .vertical-card-fields dt{font-size:3.3pt}
+  .print-qr .vertical-card-fields dd{margin-top:.8mm;font-size:4.4pt}
+  .print-qr .vertical-card-footer{bottom:4%;font-size:3.3pt}
+  .print-qr .vertical-card-footer b{font-size:4pt}
+  .print-qr .vertical-back-brand{top:5%;left:8%;right:8%;gap:2mm}
+  .print-qr .vertical-back-brand .school-crest{width:7.2mm;height:7.2mm;border-width:.5mm}
+  .print-qr .vertical-back-brand>span{font-size:6.2pt}
+  .print-qr .vertical-back-brand>span small{font-size:3.6pt}
+  .print-qr .vertical-qr-copy{top:25%}
+  .print-qr .vertical-qr-copy small{font-size:3.8pt}
+  .print-qr .vertical-qr-copy h2{margin-top:.9mm;font-size:5.6pt}
+  .print-qr .id-card-back .qr-frame{left:5%;right:5%;top:31%;bottom:9%;padding:1.5mm;border:0}
+  .print-qr .id-card-back .qr-preview{width:100%;height:100%;max-width:none}
+  .print-qr .id-qr-hint{bottom:3.5%;font-size:3.2pt}
   .print-qr .secret-controls,.print-qr .dialog-close{display:none!important}
+  .print-qr .id-card-face{print-color-adjust:exact;-webkit-print-color-adjust:exact}
 }
