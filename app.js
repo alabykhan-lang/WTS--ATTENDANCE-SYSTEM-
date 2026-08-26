@@ -660,12 +660,12 @@
     const reference = text(person.reference, "—");
     const session = text(state.context?.session, "Current session");
     const role = text(
-      person.designation || person.role || person.group_name || person.staff_category,
+      person.designation || person.role || person.staff_role || person.position || person.staff_category || person.group_name,
       "Staff",
     );
-    const department = text(person.department || person.school_section, "—");
-    const group = text(person.group_name, "—");
-    const house = text(person.house, "—");
+    const department = text(person.department || person.school_section || person.unit, "—");
+    const group = text(person.class_name || person.class || person.level || person.group_name, "—");
+    const house = text(person.house || person.house_name, "—");
     const qrImage = inlineQr && card.qrDataUrl
       ? '<img class="qr-preview" data-card-qr="' + index + '" src="' + esc(card.qrDataUrl) + '" alt="Secure attendance QR code">'
       : '<img class="qr-preview" data-card-qr="' + index + '" alt="Secure attendance QR code">';
