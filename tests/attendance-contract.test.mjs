@@ -112,13 +112,13 @@ test("scanner opens as an always-ready camera with a bundled decoder fallback", 
   assert.match(source, /detectNativeQrFrame/);
   assert.match(source, /Promise\.race/);
   assert.match(source, /150/);
-  assert.match(source, /scanner\.js\?v=7/);
+  assert.match(html, /scanner\.js\?v=7/);
   assert.match(source, /focusWidth/);
   assert.match(source, /tuneCameraTrack/);
   assert.match(source, /zoom/);
   assert.match(source, /nativeDetector\.detect\(video\)/);
-  assert.match(source, /if \(value\) return value;/);
-  assert.match(source, /maxWidth = 960/);
+  assert.match(source, /if \(focusedValue\) return focusedValue;/);
+  assert.match(source, /1280 \/ Math\.max\(width, height\)/);
   assert.match(source, /WTS_VENDOR\?\.jsQR/);
   assert.match(source, /Remove this card first/);
   assert.match(source, /Allow and start camera/);
