@@ -108,6 +108,10 @@ test("scanner opens as an always-ready camera with a bundled decoder fallback", 
   assert.match(source, /startActiveReader\(true\)/);
   assert.match(source, /async function detectQrFrame/);
   assert.match(source, /decodeQrRegion/);
+  assert.match(source, /detectNativeQrFrame/);
+  assert.match(source, /Promise\.race/);
+  assert.match(source, /150/);
+  assert.match(source, /scanner\.js\?v=7/);
   assert.match(source, /focusWidth/);
   assert.match(source, /tuneCameraTrack/);
   assert.match(source, /zoom/);
