@@ -144,3 +144,45 @@
   .print-qr .secret-controls,.print-qr .dialog-close{display:none!important}
   .print-qr .id-card-face{print-color-adjust:exact;-webkit-print-color-adjust:exact}
 }
+
+/* QR-only attendance output. The school’s card designer owns the ID-card front. */
+.qr-bulk-tools{margin:18px 0;padding:20px 22px;border-color:#cfe9dd;background:linear-gradient(135deg,#f7fcfa 0%,#fff 70%)}
+.qr-bulk-tools .card-heading{align-items:flex-start}
+.qr-bulk-tools .card-heading h2{margin-bottom:4px}
+.qr-bulk-tools .card-heading p{margin:5px 0 0;color:var(--muted);font-size:12px;max-width:720px}
+.bulk-qr-toolbar{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-top:17px}
+.bulk-class-field{display:grid;gap:7px;min-width:min(100%,250px);font-size:12px;font-weight:750;color:#31465f}
+.bulk-class-field select{width:100%;min-height:46px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--ink);padding:11px 13px}
+.bulk-qr-toolbar .button-row{display:flex;gap:8px;flex-wrap:wrap}
+#qrBatchStatus{margin:11px 0 0}
+.qr-bulk-tools .badge{margin-top:1px}
+
+.qr-print-sheet{width:min(1220px,calc(100vw - 24px));max-width:calc(100vw - 24px);max-height:calc(100vh - 24px);display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:24px;padding:24px;text-align:left;overflow:auto}
+.qr-print-area{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-content:start;min-width:0}
+.attendance-qr-block{display:grid;grid-template-rows:auto auto auto 1fr auto;gap:14px;min-width:0;padding:20px;background:#fff;border:1px solid #d6e2e7;border-radius:18px;color:#0b1f3a;box-shadow:0 14px 34px rgba(5,29,52,.12);break-inside:avoid;page-break-inside:avoid;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+.student-qr-block{border-top:5px solid #07998d}.staff-qr-block{border-top:5px solid #2d3c7b}
+.qr-block-heading{display:flex;align-items:center;gap:12px;min-width:0}
+.qr-block-mark{display:grid;place-items:center;flex:0 0 auto;width:48px;height:48px;border-radius:14px;background:#0b1f3a;color:#fff;font-size:12px;font-weight:950;letter-spacing:.06em}
+.student-qr-block .qr-block-mark{background:#07998d}.staff-qr-block .qr-block-mark{background:#2d3c7b}
+.qr-block-title{min-width:0}.qr-block-title small{display:block;color:#6d8091;font-size:9px;font-weight:900;letter-spacing:.12em}.qr-block-title h2{margin:4px 0 2px;color:#0b1f3a;font-size:17px;line-height:1.08;overflow-wrap:anywhere}.qr-block-title p{margin:0;color:#65798a;font-size:11px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qr-block-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.qr-block-meta div{min-width:0;padding-top:8px;border-top:1px solid #e1e8ec}.qr-block-meta span{display:block;color:#7b8c9b;font-size:8px;font-weight:900;letter-spacing:.1em}.qr-block-meta b{display:block;margin-top:3px;color:#18334e;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qr-block-code{display:grid;place-items:center;gap:10px;padding:16px;background:#fff;border:1px solid #e1e8ec;border-radius:14px}.qr-block-code>span{color:#526b7e;font-size:9px;font-weight:950;letter-spacing:.14em}.qr-block-code .qr-preview{display:block;width:min(100%,290px);height:auto;max-width:none;margin:0;background:#fff;border:12px solid #fff;box-shadow:0 6px 22px rgba(11,31,58,.12);image-rendering:pixelated}.qr-placeholder{display:grid;place-items:center;width:220px;aspect-ratio:1;background:#edf3f5;color:#668093;border:12px solid #fff;font-weight:950;letter-spacing:.08em}
+.qr-block-footer{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;color:#6b7d8d;font-size:9px;line-height:1.25}.qr-block-footer span{max-width:80%}.qr-block-footer b{color:#176b55;font-size:9px;letter-spacing:.08em}
+.qr-print-sheet>.secret-controls{align-self:center}.qr-print-sheet>.secret-controls h2{font-size:21px}.qr-print-sheet>.secret-controls p{line-height:1.5}
+
+@media(max-width:1060px){.qr-print-sheet{grid-template-columns:1fr;max-height:calc(100vh - 24px)}.qr-print-sheet>.secret-controls{width:100%;text-align:center}}
+@media(max-width:760px){.qr-print-area{grid-template-columns:1fr}.qr-print-sheet{padding:16px}.bulk-qr-toolbar{display:grid;grid-template-columns:1fr}.bulk-qr-toolbar .button-row{display:grid;grid-template-columns:1fr}.bulk-qr-toolbar .button-row>*{width:100%}}
+@media print{
+  @page{size:A4 portrait;margin:8mm}
+  .print-qr #qrDialog{display:block!important;position:static;width:auto!important;margin:0;padding:0;background:#fff}
+  .print-qr #qrDialog::backdrop{display:none}
+  .print-qr .qr-print-sheet{width:auto;max-width:none;max-height:none;display:block;padding:0;background:#fff;box-shadow:none;overflow:visible}
+  .print-qr .qr-print-area{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6mm}
+  .print-qr .attendance-qr-block{min-height:76mm;padding:4mm;gap:3mm;border:.3mm solid #c3cdd3;border-radius:2mm;box-shadow:none;break-inside:avoid;page-break-inside:avoid}
+  .print-qr .student-qr-block,.print-qr .staff-qr-block{border-top-width:1.2mm}
+  .print-qr .qr-block-heading{gap:2.5mm}.print-qr .qr-block-mark{width:10mm;height:10mm;border-radius:3mm;font-size:7pt}.print-qr .qr-block-title small{font-size:5.5pt}.print-qr .qr-block-title h2{margin:1mm 0 .5mm;font-size:9.5pt}.print-qr .qr-block-title p{font-size:6.5pt}
+  .print-qr .qr-block-meta{gap:2.5mm}.print-qr .qr-block-meta div{padding-top:1.8mm}.print-qr .qr-block-meta span{font-size:4.5pt}.print-qr .qr-block-meta b{margin-top:.7mm;font-size:6.5pt}
+  .print-qr .qr-block-code{gap:1.5mm;padding:1.5mm;border:.25mm solid #d6e0e5;border-radius:1.5mm}.print-qr .qr-block-code>span{font-size:5pt}.print-qr .qr-block-code .qr-preview{width:47mm;height:47mm;max-width:none;border:2mm solid #fff;box-shadow:none}
+  .print-qr .qr-block-footer{font-size:5.5pt}.print-qr .qr-block-footer b{font-size:5.5pt}
+  .print-qr .secret-controls,.print-qr .dialog-close{display:none!important}
+}
