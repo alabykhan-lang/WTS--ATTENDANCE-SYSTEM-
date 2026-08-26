@@ -15,8 +15,8 @@
     mapPeople: [],
     lastQr: null,
     lastQrPersonId: null,
-    lastQrCards: [],
-    cardBatchBusy: false,
+    lastQrCodes: [],
+    qrBatchBusy: false,
     rosterSync: null,
   };
 
@@ -72,10 +72,13 @@
         DEVICE_NAME_REQUIRED: "Give the device a clear name, such as Main Gate Phone.",
         DEVICE_CODE_EXISTS: "That device code is already in use. Create a new code and try again.",
         INVALID_DEVICE_METHOD: "Choose whether the device reads QR codes, NFC cards, or both.",
-        CREDENTIAL_ALREADY_ASSIGNED: "This card is already linked to somebody else.",
-        QR_REPRINT_UNAVAILABLE: "This older QR card cannot be reprinted from the portal. Use Replace card once to create a reprint-safe card.",
-        QR_CREDENTIAL_NOT_REPLACEABLE: "That QR card has already been replaced or expired.",
-        QR_REPLACEMENT_FAILED: "The replacement did not complete, so the old card was left unchanged.",
+        CREDENTIAL_ALREADY_ASSIGNED: "This credential is already linked to somebody else.",
+        QR_USED_CARD_REQUIRES_REPLACEMENT: "This QR has already recorded attendance. Replace it only if the printed QR was lost or damaged.",
+        QR_REPLACEMENT_NOT_ALLOWED_BEFORE_USE: "This QR has not been used yet. Generate or download it again; replacement is only for a used QR that was lost or damaged.",
+        QR_INITIAL_RESET_NOT_ALLOWED_AFTER_USE: "This QR has already been used. It was not changed automatically; replace it only after loss or damage.",
+        QR_REPRINT_UNAVAILABLE: "This older QR is being refreshed automatically because it has not been used yet.",
+        QR_CREDENTIAL_NOT_REPLACEABLE: "That QR has already been replaced or expired.",
+        QR_REPLACEMENT_FAILED: "The replacement did not complete, so the old QR was left unchanged.",
         PERSON_TYPE_REQUIRED: "Choose Students or Staff before searching.",
       };
       const error = new Error(data?.message || friendlyErrors[data?.code] || "Attendance could not complete that request.");
@@ -126,7 +129,7 @@
   function fillClassSelectors() {
     const options = contextClasses();
     setOptions("#reportClass", options, globalScope() ? "All classes" : "Choose class");
-    setOptions("#cardBatchClass", options, "Choose a class");
+    setOptions("#qrBatchClass", options, "Choose a class");
     if (!globalScope() && !$("#reportClass")?.value && options[0]) $("#reportClass").value = options[0].value;
   }
 
@@ -149,7 +152,7 @@
     const titles = {
       overview: ["Home", "Today's attendance in one place."],
       scan: ["Take Attendance", "Scan a QR code or tap an NFC card."],
-      credentials: ["ID Cards", "Show or print permanent student and staff ID cards."],
+      credentials: ["QR Codes", "Generate and print attendance QR codes for students and staff."],
       devices: ["Set Up Devices", "Add a school phone, scanner, or card reader."],
       imports: ["Bring In Records", "Receive scans now or upload records saved by a device."],
       corrections: ["Fix a Record", "Review a record that needs correction."],
@@ -267,15 +270,16 @@
       const isQr = credentialType.includes("qr");
       const status = String(credential.status || "").toLowerCase();
       const id = credential.id || credential.credential_id || "";
-      const method = isQr ? "Permanent QR ID card" : credentialType.includes("nfc") ? "NFC tap card" : "Attendance card";
-      const label = credential.credential_label || (isQr ? "Permanent attendance QR" : "School ID card");
+      const hasBeenUsed = Boolean(credential.last_used_at);
+      const method = isQr ? "Permanent attendance QR" : credentialType.includes("nfc") ? "NFC tap card" : "Attendance credential";
+      const label = credential.credential_label || (isQr ? "Attendance QR code" : "NFC attendance card");
       const detail = label + (credential.token_last4 ? " · ending " + credential.token_last4 : "");
       const actions = [];
-      if (isQr && ["active", "pending"].includes(status)) actions.push('<button class="mini-button" data-show-credential="' + esc(id) + '">Show ID card</button>');
-      if (["active", "pending"].includes(status)) actions.push('<button class="mini-button reject" data-block-credential="' + esc(id) + '">Block card</button>');
-      if (isQr && !["replaced", "expired"].includes(status)) actions.push('<button class="mini-button approve" data-replace-credential="' + esc(id) + '">Replace card</button>');
+      if (isQr && ["active", "pending"].includes(status)) actions.push('<button class="mini-button" data-show-credential="' + esc(id) + '">Show QR code</button>');
+      if (["active", "pending"].includes(status)) actions.push('<button class="mini-button reject" data-block-credential="' + esc(id) + '">Block ' + (isQr ? "QR" : "card") + '</button>');
+      if (isQr && hasBeenUsed && !["replaced", "expired"].includes(status)) actions.push('<button class="mini-button approve" data-replace-credential="' + esc(id) + '">Replace used QR</button>');
       return '<div class="credential-row"><div><b>' + method + '</b><small>' + esc(detail) + '</small></div><div class="credential-actions"><span class="badge ' + statusClass(status) + '">' + esc(cleanStatus(status)) + "</span>" + actions.join("") + "</div></div>";
-    }).join("") : '<div class="empty">No attendance card has been prepared yet.</div>';
+    }).join("") : '<div class="empty">No attendance credential has been prepared yet.</div>';
   }
 
   async function digest(value) {
@@ -288,32 +292,32 @@
     if (!state.selectedPerson) return toast("Select a real person first.", "error");
     const person = state.selectedPerson;
     const payload = person.personType === "student"
-      ? { studentId: person.id, credentialType: "qr_token", label: person.displayName + " permanent QR ID card" }
-      : { staffId: person.id, credentialType: "qr_token", label: person.displayName + " permanent QR ID card" };
+      ? { studentId: person.id, credentialType: "qr_token", label: person.displayName + " attendance QR" }
+      : { staffId: person.id, credentialType: "qr_token", label: person.displayName + " attendance QR" };
     const data = await qrWrite("issueQr", payload);
     const raw = data.credential?.raw_token;
-    if (!raw) throw new Error("The QR value was not returned for this card.");
-    await showCardPreview(data.credential?.existing ? "ID card ready to reprint" : "Permanent ID card ready", [{ person, raw }]);
+    if (!raw) throw new Error("The QR value was not returned.");
+    await showQrPreview(data.credential?.existing ? "Attendance QR ready" : "Attendance QR created", [{ person, raw }]);
     toast(data.credential?.existing ? "The same permanent QR code was loaded." : "Permanent QR code created and saved for reprinting.", "success");
     await selectCredentialPerson(person.id);
   }
 
   async function replaceQrCard(credentialId) {
     if (!state.selectedPerson) return toast("Select a real person first.", "error");
-    if (!window.confirm("Block the current QR card and create a replacement? The old card will stop working.")) return;
-    const reason = window.prompt("Why is this card being replaced?", "Lost or damaged card");
+    if (!window.confirm("This QR has already been used for attendance. Block it and create a replacement for a lost or damaged QR?")) return;
+    const reason = window.prompt("Why is this QR being replaced?", "Lost or damaged QR");
     if (reason === null) return;
     const person = state.selectedPerson;
     const payload = {
       credentialId,
-      reason: reason.trim() || "QR card replacement requested",
-      label: person.displayName + " permanent QR ID card",
+      reason: reason.trim() || "Lost or damaged attendance QR",
+      label: person.displayName + " attendance QR",
     };
     const data = await qrWrite("replaceQr", payload);
     const raw = data.credential?.raw_token;
     if (!raw) throw new Error("The replacement QR value was not returned.");
-    await showCardPreview("Replacement ID card ready", [{ person, raw }]);
-    toast("The old card is blocked and the replacement QR is ready.", "success");
+    await showQrPreview("Replacement attendance QR ready", [{ person, raw }]);
+    toast("The old QR is blocked and the replacement QR is ready.", "success");
     await selectCredentialPerson(person.id);
   }
 
@@ -325,56 +329,56 @@
       credentialId,
       reason: reason.trim() || "Credential blocked",
     });
-    toast("Card blocked. Use Replace card to issue another one.", "success");
+    toast("Credential blocked. A used QR can be replaced if the printed QR was lost or damaged.", "success");
     if (state.selectedPerson) await selectCredentialPerson(state.selectedPerson.id);
   }
 
-  function setCardBatchStatus(message, kind) {
-    const node = $("#cardBatchStatus");
+  function setQrBatchStatus(message, kind) {
+    const node = $("#qrBatchStatus");
     if (!node) return;
     node.textContent = message;
     node.className = "small-note" + (kind ? " " + kind : "");
   }
 
-  async function prepareCardBatch(type, classKey = "") {
-    if (state.cardBatchBusy) return toast("A card set is already being prepared.", "warning");
+  async function prepareQrBatch(type, classKey = "") {
+    if (state.qrBatchBusy) return toast("A QR set is already being prepared.", "warning");
     if (type === "student" && !classKey) return toast("Choose a student class first.", "error");
-    state.cardBatchBusy = true;
+    state.qrBatchBusy = true;
     const label = type === "student" ? classKey + " student" : "all staff";
     try {
-      setCardBatchStatus("Loading " + label + " records…");
+      setQrBatchStatus("Loading " + label + " records…");
       const data = await universalRead("people", { personType: type, search: classKey || "" });
       let people = (data.people || []).map((person) => normalizeCredentialPerson(person, type));
       if (type === "student" && classKey) {
-        people = people.filter((person) => String(person.group_name || "").toLowerCase() === String(classKey).toLowerCase());
+        people = people.filter((person) => String(person.group_name || person.class_name || person.class || person.level || "").toLowerCase() === String(classKey).toLowerCase());
       }
       if (!people.length) return toast("No active " + (type === "student" ? "students" : "staff") + " were found for that set.", "warning");
-      const cards = [];
+      const codes = [];
       const skipped = [];
       for (let index = 0; index < people.length; index += 1) {
         const person = people[index];
-        setCardBatchStatus("Preparing " + label + " cards · " + (index + 1) + " of " + people.length + "…");
+        setQrBatchStatus("Preparing " + label + " QR codes · " + (index + 1) + " of " + people.length + "…");
         try {
           const payload = person.personType === "student"
-            ? { studentId: person.id, credentialType: "qr_token", label: person.displayName + " permanent QR ID card" }
-            : { staffId: person.id, credentialType: "qr_token", label: person.displayName + " permanent QR ID card" };
+            ? { studentId: person.id, credentialType: "qr_token", label: person.displayName + " attendance QR" }
+            : { staffId: person.id, credentialType: "qr_token", label: person.displayName + " attendance QR" };
           const result = await qrWrite("issueQr", payload);
-          if (result.credential?.raw_token) cards.push({ person, raw: result.credential.raw_token });
+          if (result.credential?.raw_token) codes.push({ person, raw: result.credential.raw_token });
           else skipped.push({ person, message: "QR value was not returned" });
         } catch (error) {
-          skipped.push({ person, message: error.message || "QR card unavailable" });
+          skipped.push({ person, message: error.message || "QR code unavailable" });
         }
       }
-      if (!cards.length) {
-        setCardBatchStatus("No cards are ready. Older cards may need an explicit replacement first.", "error");
-        return toast("No printable cards were returned for this set.", "error");
+      if (!codes.length) {
+        setQrBatchStatus("No QR codes are ready. Used credentials with a missing value need a loss/damage replacement.", "error");
+        return toast("No printable QR codes were returned for this set.", "error");
       }
-      await showCardPreview((type === "student" ? "Class " + classKey : "All staff") + " ID cards ready", cards);
-      const suffix = skipped.length ? " " + skipped.length + " older card(s) need Replace card first." : "";
-      setCardBatchStatus(cards.length + " card(s) ready for print." + suffix, skipped.length ? "warning" : "success");
-      toast(cards.length + " ID card(s) are ready. Use Print / save ID cards in the preview.", "success");
+      await showQrPreview((type === "student" ? "Class " + classKey : "All staff") + " attendance QR codes ready", codes);
+      const suffix = skipped.length ? " " + skipped.length + " QR code(s) need review because their credential was already used." : "";
+      setQrBatchStatus(codes.length + " QR code(s) ready for print." + suffix, skipped.length ? "warning" : "success");
+      toast(codes.length + " attendance QR code(s) are ready. Download the PNG or print the complete QR sheet.", "success");
     } finally {
-      state.cardBatchBusy = false;
+      state.qrBatchBusy = false;
     }
   }
 
@@ -622,7 +626,7 @@
       "attendance.register.confirm": "Confirm class attendance",
       "staff.read": "See staff attendance",
       "reports.read": "View reports",
-      "credentials.manage": "Prepare ID cards",
+      "credentials.manage": "Generate attendance QR codes",
       "devices.read": "See school devices",
       "devices.manage": "Set up school devices",
       "imports.read": "See uploaded records",
@@ -652,86 +656,84 @@
     toast("Central Registry roster re-synchronised safely.", "success");
   }
 
-
-  function renderIdCardPair(card, index, { inlineQr = false } = {}) {
-    const person = card.person || {};
+  function renderQrBlock(code, index, { inlineQr = false } = {}) {
+    const person = code.person || {};
     const isStudent = person.personType === "student";
-    const family = isStudent ? "student" : "staff";
-    const reference = text(person.reference, "—");
-    const session = text(state.context?.session, "Current session");
-    const role = text(
-      person.designation || person.role || person.staff_role || person.position || person.staff_category || person.group_name,
-      "Staff",
-    );
-    const department = text(person.department || person.school_section || person.unit, "—");
-    const group = text(person.class_name || person.class || person.level || person.group_name, "—");
-    const house = text(person.house || person.house_name, "—");
-    const qrImage = inlineQr && card.qrDataUrl
-      ? '<img class="qr-preview" data-card-qr="' + index + '" src="' + esc(card.qrDataUrl) + '" alt="Secure attendance QR code">'
-      : '<img class="qr-preview" data-card-qr="' + index + '" alt="Secure attendance QR code">';
-    const frontMarkup = isStudent
-      ? '<header class="vertical-card-brand"><b class="school-crest"><img src="/assets/wts-school-logo.jpg" alt="Way to Success Standard Schools logo"></b><span>WAY TO SUCCESS STANDARD SCHOOLS<small>IFEDAPO COMMUNITY · EJIGBO</small></span></header>' +
-        '<div class="vertical-card-portrait student-portrait"><div class="id-avatar">' + avatarMarkup(person, "S") + '</div></div>' +
-        '<div class="vertical-card-info student-card-info"><h2>' + esc(text(person.displayName, "WTS student")) + '</h2><p class="vertical-card-subtitle">STUDENT</p><dl class="vertical-card-fields"><div><dt>ADMISSION NO.</dt><dd>' + esc(reference) + '</dd></div><div><dt>CLASS</dt><dd>' + esc(group) + '</dd></div><div><dt>HOUSE</dt><dd>' + esc(house) + '</dd></div></dl></div>' +
-        '<footer class="vertical-card-footer"><span>WAY TO SUCCESS</span><b>' + esc(session) + '</b></footer>'
-      : '<header class="vertical-card-brand"><b class="school-crest"><img src="/assets/wts-school-logo.jpg" alt="Way to Success Standard Schools logo"></b><span>WAY TO SUCCESS STANDARD SCHOOLS<small>IFEDAPO COMMUNITY · EJIGBO</small></span></header>' +
-        '<div class="vertical-card-portrait staff-portrait"><div class="id-avatar">' + avatarMarkup(person, "W") + '</div></div>' +
-        '<div class="vertical-card-info staff-card-info"><h2>' + esc(text(person.displayName, "WTS staff")) + '</h2><p class="vertical-card-role">' + esc(role) + '</p><dl class="vertical-card-fields"><div><dt>STAFF NUMBER</dt><dd>' + esc(reference) + '</dd></div><div><dt>DEPARTMENT</dt><dd>' + esc(department) + '</dd></div></dl></div>' +
-        '<footer class="vertical-card-footer"><span>WAY TO SUCCESS</span><b>' + esc(session) + '</b></footer>';
-    return '<div class="id-card-pair ' + family + '-card-pair">' +
-      '<section class="id-side-wrap"><span class="id-side-label">FRONT · ' + (isStudent ? "STUDENT" : "TEACHER") + '</span>' +
-        '<article class="id-card-face id-card-front ' + (isStudent ? "student-card-front" : "staff-card-front") + '">' + frontMarkup + '</article>' +
-      '</section>' +
-      '<section class="id-side-wrap"><span class="id-side-label">BACK · QR ONLY</span>' +
-        '<article class="id-card-face id-card-back ' + family + '-card-back">' +
-          '<header class="vertical-back-brand"><b class="school-crest"><img src="/assets/wts-school-logo.jpg" alt="Way to Success Standard Schools logo"></b><span>WTS ATTENDANCE<small>SCAN FOR ATTENDANCE</small></span></header>' +
-          '<div class="vertical-qr-copy"><small>ATTENDANCE QR CODE</small><h2>SHOW THIS SIDE TO THE SCANNER</h2></div>' +
-          '<div class="qr-frame">' + qrImage + '</div>' +
-          '<p class="id-qr-hint">KEEP THE CODE CLEAR</p>' +
-        '</article>' +
-      '</section>' +
-    '</div>';
+    const kind = isStudent ? "STUDENT" : "STAFF";
+    const reference = text(person.reference, "No school number");
+    const groupOrRole = isStudent
+      ? text(person.class_name || person.class || person.level || person.group_name, "No class")
+      : text(person.designation || person.role || person.staff_role || person.position || person.staff_category || person.group_name, "Staff");
+    const departmentOrGroup = isStudent
+      ? text(person.house || person.house_name, "—")
+      : text(person.department || person.school_section || person.unit, "School staff");
+    const qrImage = inlineQr && code.qrDataUrl
+      ? '<img class="qr-preview" data-qr-index="' + index + '" src="' + esc(code.qrDataUrl) + '" alt="Attendance QR code for ' + esc(text(person.displayName, "person")) + '">'
+      : '<span class="qr-placeholder" data-qr-index="' + index + '">QR</span>';
+    return '<article class="attendance-qr-block ' + (isStudent ? "student-qr-block" : "staff-qr-block") + '">' +
+      '<header class="qr-block-heading"><span class="qr-block-mark">QR</span><div class="qr-block-title"><small>WTS ATTENDANCE · ' + kind + '</small><h2>' + esc(text(person.displayName, "WTS person")) + '</h2><p>' + esc(reference) + ' · ' + esc(groupOrRole) + '</p></div></header>' +
+      '<div class="qr-block-meta"><div><span>IDENTIFIER</span><b>' + esc(reference) + '</b></div><div><span>' + (isStudent ? "HOUSE" : "DEPARTMENT") + '</span><b>' + esc(departmentOrGroup) + '</b></div></div>' +
+      '<div class="qr-block-code"><span>SCAN THIS CODE</span>' + qrImage + '</div>' +
+      '<footer class="qr-block-footer"><span>Attendance QR only · place on the back of the school ID card</span><b>' + kind + '</b></footer>' +
+    '</article>';
   }
 
-  async function showCardPreview(title, cards) {
-    const safeCards = (cards || []).filter((card) => card && card.person && card.raw);
-    if (!safeCards.length) throw new Error("No printable ID card was returned.");
-    const printAreaNode = $("#cardPrintArea");
-    if (!printAreaNode) throw new Error("The ID card preview is unavailable.");
+  async function showQrPreview(title, codes) {
+    const safeCodes = (codes || []).filter((code) => code && code.person && code.raw);
+    if (!safeCodes.length) throw new Error("No printable QR code was returned.");
+    const printAreaNode = $("#qrPrintArea");
+    if (!printAreaNode) throw new Error("The QR preview is unavailable.");
     if (!window.WTS_VENDOR?.QRCode) throw new Error("The QR renderer is unavailable. Refresh the portal and try again.");
 
-    const preparedCards = [];
-    for (const card of safeCards) {
-      const qrDataUrl = await window.WTS_VENDOR.QRCode.toDataURL(card.raw, {
-        width: 1200,
-        margin: 5,
-        errorCorrectionLevel: "M",
-        color: { dark: "#0b1f3a", light: "#ffffff" },
+    const preparedCodes = [];
+    for (const code of safeCodes) {
+      const qrDataUrl = await window.WTS_VENDOR.QRCode.toDataURL(code.raw, {
+        width: 1600,
+        margin: 6,
+        errorCorrectionLevel: "H",
+        color: { dark: "#000000", light: "#ffffff" },
       });
-      preparedCards.push({ ...card, qrDataUrl });
+      preparedCodes.push({ ...code, qrDataUrl });
     }
 
-    printAreaNode.innerHTML = preparedCards.map((card, index) => renderIdCardPair(card, index, { inlineQr: true })).join("");
-    $("#secretTitle").textContent = title;
-    $("#secretIntro").textContent = preparedCards.length === 1
-      ? "The portrait front and QR-only back are ready. The same permanent code can be printed again."
-      : preparedCards.length + " complete front-and-back cards are ready in this print document.";
-    $("#secretValue").textContent = "";
-    $("#copySecret").hidden = true;
+    printAreaNode.innerHTML = preparedCodes.map((code, index) => renderQrBlock(code, index, { inlineQr: true })).join("");
+    $("#qrTitle").textContent = title;
+    $("#qrIntro").textContent = preparedCodes.length === 1
+      ? "This attendance QR is ready to download or print. The code stays the same for this person until an authorised replacement is issued."
+      : preparedCodes.length + " complete attendance QR codes are ready. Every selected person is included in this print document.";
+    $("#downloadQrPng").hidden = preparedCodes.length !== 1;
     $("#printQrDialog").hidden = false;
-    $("#printQrDialog").textContent = preparedCards.length === 1 ? "Print / save ID card" : "Print / save all ID cards";
+    $("#printQrDialog").textContent = preparedCodes.length === 1 ? "Print / save QR PDF" : "Print / save all QR codes";
 
-    state.lastQrCards = preparedCards;
-    state.lastQr = preparedCards.length === 1 ? preparedCards[0].raw : null;
-    state.lastQrPersonId = preparedCards.length === 1 ? preparedCards[0].person.id : null;
-    const dialog = $("#secretDialog");
+    state.lastQrCodes = preparedCodes;
+    state.lastQr = preparedCodes.length === 1 ? preparedCodes[0].raw : null;
+    state.lastQrPersonId = preparedCodes.length === 1 ? preparedCodes[0].person.id : null;
+    const dialog = $("#qrDialog");
     if (dialog.open) dialog.close();
     dialog.showModal();
   }
 
-  async function printCardBatch() {
-    const cards = (state.lastQrCards || []).filter((card) => card?.person && card?.qrDataUrl);
-    if (!cards.length) return toast("Prepare the ID card set first.", "warning");
+  function filenamePart(value, fallback) {
+    const cleaned = String(value || fallback || "item").normalize("NFKD").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase();
+    return cleaned || fallback || "item";
+  }
+
+  function downloadQrPng() {
+    const code = (state.lastQrCodes || [])[0];
+    if (!code?.qrDataUrl) return toast("Prepare one person’s QR code first.", "warning");
+    const person = code.person || {};
+    const link = document.createElement("a");
+    link.href = code.qrDataUrl;
+    link.download = `WTS-attendance-QR-${filenamePart(person.displayName, "person")}-${filenamePart(person.reference, "number")}.png`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    toast("QR PNG download started.", "success");
+  }
+
+  async function printQrBatch() {
+    const codes = (state.lastQrCodes || []).filter((code) => code?.person && code?.qrDataUrl);
+    if (!codes.length) return toast("Prepare the attendance QR codes first.", "warning");
 
     const printWindow = window.open("", "_blank");
     if (!printWindow) {
@@ -741,10 +743,10 @@
 
     const printBase = esc(window.location.origin + "/");
     const stylesheet = esc(window.location.origin + "/styles.css");
-    const markup = cards.map((card, index) => renderIdCardPair(card, index, { inlineQr: true })).join("");
+    const markup = codes.map((code, index) => renderQrBlock(code, index, { inlineQr: true })).join("");
     printWindow.document.open();
     printWindow.document.write(
-      '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>WTS ID cards</title><base href="' + printBase + '"><link rel="stylesheet" href="' + stylesheet + '"></head><body class="print-qr"><main class="id-print-sheet"><div class="id-card-print-area">' + markup + '</div></main></body></html>',
+      '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>WTS attendance QR codes</title><base href="' + printBase + '"><link rel="stylesheet" href="' + stylesheet + '"></head><body class="print-qr"><main class="qr-print-sheet"><div class="qr-print-area">' + markup + '</div></main></body></html>',
     );
     printWindow.document.close();
 
@@ -803,10 +805,10 @@
     $("#searchCredentials").onclick = () => loadCredentialPeople().catch((error) => toast(error.message, "error"));
     $("#credentialSearch").onkeydown = (event) => { if (event.key === "Enter") loadCredentialPeople().catch((error) => toast(error.message, "error")); };
     $("#issueQr").onclick = () => issueQr().catch((error) => toast(error.message, "error"));
-    $("#downloadClassCards").onclick = () => prepareCardBatch("student", $("#cardBatchClass").value).catch((error) => toast(error.message, "error"));
-    $("#downloadStaffCards").onclick = () => prepareCardBatch("staff").catch((error) => toast(error.message, "error"));
+    $("#downloadClassQr").onclick = () => prepareQrBatch("student", $("#qrBatchClass").value).catch((error) => toast(error.message, "error"));
+    $("#downloadStaffQr").onclick = () => prepareQrBatch("staff").catch((error) => toast(error.message, "error"));
     $("#credentialAssignForm").onsubmit = (event) => assignCredential(event).catch((error) => toast(error.message, "error"));
-    $("#printQr").onclick = () => issueQr().catch((error) => toast(error.message, "error"));
+    $("#showQrAgain").onclick = () => issueQr().catch((error) => toast(error.message, "error"));
     $("#addDevice").onclick = openDeviceSetup;
     $("#deviceForm").onsubmit = (event) => addDevice(event).catch((error) => toast(error.message, "error"));
     $("#cancelDevice").onclick = () => $("#deviceDialog").close();
@@ -825,10 +827,10 @@
     $("#runReport").onclick = () => runReport().catch((error) => toast(error.message, "error"));
     $("#retryRosterSync").onclick = () => retryRosterSync().catch((error) => toast(error.message, "error"));
     $("#printReport").onclick = () => printArea("print-report");
-    $("#closeSecret").onclick = () => $("#secretDialog").close();
-    $("#closeSecretButton").onclick = () => $("#secretDialog").close();
-    $("#copySecret").onclick = () => navigator.clipboard?.writeText($("#secretValue").textContent).then(() => toast("Copied to clipboard.", "success"));
-    $("#printQrDialog").onclick = () => printCardBatch().catch((error) => toast(error.message, "error"));
+    $("#closeQr").onclick = () => $("#qrDialog").close();
+    $("#closeQrButton").onclick = () => $("#qrDialog").close();
+    $("#downloadQrPng").onclick = downloadQrPng;
+    $("#printQrDialog").onclick = () => printQrBatch().catch((error) => toast(error.message, "error"));
     $("#reportFrom").value = monthStart();
     $("#reportTo").value = todayIso();
   }
@@ -839,6 +841,15 @@
     applyNavigation();
     fillClassSelectors();
     connected(true);
+    if (permission("credentials.manage") || globalScope()) {
+      try {
+        const refreshed = await qrWrite("refreshUnusedQr");
+        const resetCount = Number(refreshed.reset_count || 0);
+        if (resetCount > 0) toast(`${resetCount} unused legacy QR code${resetCount === 1 ? "" : "s"} refreshed and ready to download.`, "success");
+      } catch (error) {
+        console.warn("Unused QR refresh was not completed", error);
+      }
+    }
     await loadOverview();
   }
 
