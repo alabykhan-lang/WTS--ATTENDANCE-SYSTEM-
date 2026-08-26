@@ -77,6 +77,7 @@
     syncing: false,
     lastFingerprint: "",
     lastScanAt: 0,
+    nativeDetectPromise: null,
   };
 
   function parse(value, fallback) {
@@ -562,24 +563,36 @@
     }
   }
 
+  async function detectNativeQrFrame(video, nativeDetector) {
+    if (!nativeDetector || state.nativeDetectPromise) return "";
+    const detection = Promise.resolve().then(() => nativeDetector.detect(video));
+    state.nativeDetectPromise = detection;
+    const timeout = new Promise((resolve) =>
+      window.setTimeout(() => resolve(null), 150),
+    );
+    try {
+      const codes = await Promise.race([detection, timeout]);
+      const value = Array.isArray(codes)
+        ? codes.find((code) => code?.rawValue)?.rawValue || ""
+        : "";
+      return value;
+    } catch {
+      return "";
+    } finally {
+      detection
+        .finally(() => {
+          if (state.nativeDetectPromise === detection)
+            state.nativeDetectPromise = null;
+        })
+        .catch(() => {});
+    }
+  }
+
   async function detectQrFrame(video, nativeDetector) {
     if (!video.videoWidth || !video.videoHeight) return "";
 
-    // Some browsers expose BarcodeDetector but do not decode video reliably.
-    // Fall back to a focused crop and the bundled decoder when native detection
-    // is empty or fails.
-    if (nativeDetector) {
-      try {
-        const codes = await nativeDetector.detect(video);
-        const value = Array.isArray(codes)
-          ? codes.find((code) => code?.rawValue)?.rawValue || ""
-          : "";
-        if (value) return value;
-      } catch {}
-    }
-
     const jsQR = window.WTS_VENDOR?.jsQR;
-    if (!jsQR) return "";
+    if (!jsQR) return detectNativeQrFrame(video, nativeDetector);
     const canvas = $("#cameraCanvas");
     const context = canvas.getContext("2d", { willReadFrequently: true });
     const focusWidth = Math.min(
@@ -598,6 +611,8 @@
       0,
       Math.round((video.videoHeight - focusHeight) / 2),
     );
+
+    // Decode the same centered region a user would see after camera zoom.
     const focusedValue = decodeQrRegion(
       jsQR,
       canvas,
@@ -609,7 +624,9 @@
       focusHeight,
     );
     if (focusedValue) return focusedValue;
-    return decodeQrRegion(
+
+    // Keep a full-frame pass for cards that are not perfectly centered.
+    const fullFrameValue = decodeQrRegion(
       jsQR,
       canvas,
       context,
@@ -619,6 +636,10 @@
       video.videoWidth,
       video.videoHeight,
     );
+    if (fullFrameValue) return fullFrameValue;
+
+    // Native detection is last and time-limited so it cannot block jsQR.
+    return detectNativeQrFrame(video, nativeDetector);
   }
 
   async function tuneCameraTrack(stream) {
