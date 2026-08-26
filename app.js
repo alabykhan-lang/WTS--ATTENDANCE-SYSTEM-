@@ -15,6 +15,8 @@
     mapPeople: [],
     lastQr: null,
     lastQrPersonId: null,
+    lastQrCards: [],
+    cardBatchBusy: false,
     rosterSync: null,
   };
 
@@ -71,6 +73,9 @@
         DEVICE_CODE_EXISTS: "That device code is already in use. Create a new code and try again.",
         INVALID_DEVICE_METHOD: "Choose whether the device reads QR codes, NFC cards, or both.",
         CREDENTIAL_ALREADY_ASSIGNED: "This card is already linked to somebody else.",
+        QR_REPRINT_UNAVAILABLE: "This older QR card cannot be reprinted from the portal. Use Replace card once to create a reprint-safe card.",
+        QR_CREDENTIAL_NOT_REPLACEABLE: "That QR card has already been replaced or expired.",
+        QR_REPLACEMENT_FAILED: "The replacement did not complete, so the old card was left unchanged.",
         PERSON_TYPE_REQUIRED: "Choose Students or Staff before searching.",
       };
       const error = new Error(data?.message || friendlyErrors[data?.code] || "Attendance could not complete that request.");
@@ -82,6 +87,7 @@
 
   const universalRead = (action, payload = {}) => rpc("attendance_universal_admin_read_api", action, payload);
   const universalWrite = (action, payload = {}) => rpc("attendance_universal_admin_write_api", action, payload);
+  const qrWrite = (action, payload = {}) => rpc("attendance_qr_card_api", action, payload);
   const controlsWrite = (action, payload = {}) => rpc("attendance_controls_admin_write_api", action, payload);
 
   function connected(value, message = "") {
@@ -120,6 +126,7 @@
   function fillClassSelectors() {
     const options = contextClasses();
     setOptions("#reportClass", options, globalScope() ? "All classes" : "Choose class");
+    setOptions("#cardBatchClass", options, "Choose a class");
     if (!globalScope() && !$("#reportClass")?.value && options[0]) $("#reportClass").value = options[0].value;
   }
 
@@ -142,7 +149,7 @@
     const titles = {
       overview: ["Home", "Today's attendance in one place."],
       scan: ["Take Attendance", "Scan a QR code or tap an NFC card."],
-      credentials: ["ID Cards", "Prepare a QR code or link a tap card for one person."],
+      credentials: ["ID Cards", "Show or print permanent student and staff ID cards."],
       devices: ["Set Up Devices", "Add a school phone, scanner, or card reader."],
       imports: ["Bring In Records", "Receive scans now or upload records saved by a device."],
       corrections: ["Fix a Record", "Review a record that needs correction."],
@@ -214,18 +221,27 @@
     $("#healthList").innerHTML = `<div class="health-item"><span class="health-check ${state.devices.length ? "good" : "muted"}">${state.devices.length ? "✓" : "–"}</span><div><b>${state.devices.length ? `${state.devices.length} registered device${state.devices.length === 1 ? "" : "s"}` : "Web scanner ready"}</b><small>${state.devices.length ? "Health status comes from the live Device Registry." : "Use a phone camera or compatible NFC reader."}</small></div></div><div class="health-item"><span class="health-check ${importCount ? "good" : "muted"}">${importCount ? "✓" : "–"}</span><div><b>${importCount ? `${importCount} import batch${importCount === 1 ? "" : "es"}` : "No device imports yet"}</b><small>Imported records are previewed and checksum-protected.</small></div></div>`;
   }
 
+  function normalizeCredentialPerson(person, type) {
+    return {
+      ...person,
+      personType: person.person_type || type,
+      displayName: person.display_name || person.full_name || "",
+      secondary: (person.group_name || "") + (person.reference ? " · " + person.reference : ""),
+    };
+  }
+
   async function loadCredentialPeople() {
     const type = $("#credentialPersonType").value;
     const search = $("#credentialSearch").value.trim();
     const data = await universalRead("people", { personType: type, search });
-    const people = (data.people || []).map((person) => ({
-      ...person,
-      personType: person.person_type || type,
-      displayName: person.display_name,
-      secondary: `${person.group_name || ""}${person.reference ? ` · ${person.reference}` : ""}`,
-    }));
+    const people = (data.people || []).map((person) => normalizeCredentialPerson(person, type));
     if (type === "student") state.students = people; else state.staff = people;
-    $("#credentialPeople").innerHTML = people.length ? people.map((person) => `<button class="person-item ${state.selectedPerson?.id === person.id ? "active" : ""}" data-person-id="${esc(person.id)}"><span class="avatar small-avatar">${avatarMarkup(person, "P")}</span><span><b>${esc(person.displayName)}</b><small>${esc(person.secondary || "")}</small></span><span>›</span></button>`).join("") : `<div class="empty">No live ${type === "student" ? "students" : "staff"} match that search.</div>`;
+    $("#credentialPeople").innerHTML = people.length ? people.map((person) => (
+      '<button class="person-item ' + (state.selectedPerson?.id === person.id ? "active" : "") + '" data-person-id="' + esc(person.id) + '">' +
+        '<span class="avatar small-avatar">' + avatarMarkup(person, "P") + "</span>" +
+        "<span><b>" + esc(person.displayName) + "</b><small>" + esc(person.secondary || "") + "</small></span><span>›</span>" +
+      "</button>"
+    )).join("") : '<div class="empty">No live ' + (type === "student" ? "students" : "staff") + " match that search.</div>";
   }
 
   async function selectCredentialPerson(id) {
@@ -247,9 +263,19 @@
 
   function renderCredentialList(credentials) {
     $("#credentialList").innerHTML = credentials.length ? credentials.map((credential) => {
-      const method = String(credential.credential_type || "").includes("qr") ? "QR code" : String(credential.credential_type || "").includes("nfc") ? "NFC tap card" : "ID card";
-      return `<div class="credential-row"><div><b>${method}</b><small>${esc(credential.credential_label || "School ID card")} · ending ${esc(credential.token_last4 || "----")}</small></div><div><span class="badge ${statusClass(credential.status)}">${esc(cleanStatus(credential.status))}</span>${["active", "pending"].includes(credential.status) ? `<button class="mini-button" data-suspend-credential="${esc(credential.id)}">Stop using</button>` : ""}</div></div>`;
-    }).join("") : `<div class="empty">No QR code or tap card has been prepared yet.</div>`;
+      const credentialType = String(credential.credential_type || "").toLowerCase();
+      const isQr = credentialType.includes("qr");
+      const status = String(credential.status || "").toLowerCase();
+      const id = credential.id || credential.credential_id || "";
+      const method = isQr ? "Permanent QR ID card" : credentialType.includes("nfc") ? "NFC tap card" : "Attendance card";
+      const label = credential.credential_label || (isQr ? "Permanent attendance QR" : "School ID card");
+      const detail = label + (credential.token_last4 ? " · ending " + credential.token_last4 : "");
+      const actions = [];
+      if (isQr && ["active", "pending"].includes(status)) actions.push('<button class="mini-button" data-show-credential="' + esc(id) + '">Show ID card</button>');
+      if (["active", "pending"].includes(status)) actions.push('<button class="mini-button reject" data-block-credential="' + esc(id) + '">Block card</button>');
+      if (isQr && !["replaced", "expired"].includes(status)) actions.push('<button class="mini-button approve" data-replace-credential="' + esc(id) + '">Replace card</button>');
+      return '<div class="credential-row"><div><b>' + method + '</b><small>' + esc(detail) + '</small></div><div class="credential-actions"><span class="badge ' + statusClass(status) + '">' + esc(cleanStatus(status)) + "</span>" + actions.join("") + "</div></div>";
+    }).join("") : '<div class="empty">No attendance card has been prepared yet.</div>';
   }
 
   async function digest(value) {
@@ -260,33 +286,96 @@
 
   async function issueQr() {
     if (!state.selectedPerson) return toast("Select a real person first.", "error");
-    const type = state.selectedPerson.personType;
-    const payload = type === "student" ? { studentId: state.selectedPerson.id, credentialType: "qr", label: `${state.selectedPerson.displayName} secure QR` } : { staffId: state.selectedPerson.id, credentialType: "qr", label: `${state.selectedPerson.displayName} secure QR` };
-    const data = await universalWrite("issueQr", payload);
+    const person = state.selectedPerson;
+    const payload = person.personType === "student"
+      ? { studentId: person.id, credentialType: "qr_token", label: person.displayName + " permanent QR ID card" }
+      : { staffId: person.id, credentialType: "qr_token", label: person.displayName + " permanent QR ID card" };
+    const data = await qrWrite("issueQr", payload);
     const raw = data.credential?.raw_token;
-    if (raw) await showSecret("Two-sided ID card ready", raw, true);
-    toast("QR code created. Print the ID card before closing the preview.", "success");
-    await selectCredentialPerson(state.selectedPerson.id);
+    if (!raw) throw new Error("The QR value was not returned for this card.");
+    await showCardPreview(data.credential?.existing ? "ID card ready to reprint" : "Permanent ID card ready", [{ person, raw }]);
+    toast(data.credential?.existing ? "The same permanent QR code was loaded." : "Permanent QR code created and saved for reprinting.", "success");
+    await selectCredentialPerson(person.id);
   }
 
-  async function assignCredential(event) {
-    event.preventDefault();
+  async function replaceQrCard(credentialId) {
     if (!state.selectedPerson) return toast("Select a real person first.", "error");
-    const raw = $("#credentialRaw").value.trim();
-    if (!raw) return toast("Tap the NFC card or enter its reader UID.", "error");
-    const type = "nfc_uid";
+    if (!window.confirm("Block the current QR card and create a replacement? The old card will stop working.")) return;
+    const reason = window.prompt("Why is this card being replaced?", "Lost or damaged card");
+    if (reason === null) return;
+    const person = state.selectedPerson;
     const payload = {
-      ...(state.selectedPerson.personType === "student" ? { studentId: state.selectedPerson.id } : { staffId: state.selectedPerson.id }),
-      credentialType: type,
-      rawIdentifier: raw,
-      label: $("#credentialLabel").value.trim() || "WTS NFC ID card",
-      deviceId: $("#credentialDevice").value || null,
-      metadata: { raw_hash: await digest(raw), source: "attendance_operator" },
+      credentialId,
+      reason: reason.trim() || "QR card replacement requested",
+      label: person.displayName + " permanent QR ID card",
     };
-    await universalWrite("assignCredential", payload);
-    $("#credentialRaw").value = "";
-    toast("NFC card linked and activated.", "success");
-    await selectCredentialPerson(state.selectedPerson.id);
+    const data = await qrWrite("replaceQr", payload);
+    const raw = data.credential?.raw_token;
+    if (!raw) throw new Error("The replacement QR value was not returned.");
+    await showCardPreview("Replacement ID card ready", [{ person, raw }]);
+    toast("The old card is blocked and the replacement QR is ready.", "success");
+    await selectCredentialPerson(person.id);
+  }
+
+  async function blockCredential(credentialId) {
+    if (!window.confirm("Block this card? It will no longer be accepted for attendance.")) return;
+    const reason = window.prompt("Reason for blocking this card:", "Lost or damaged card");
+    if (reason === null) return;
+    await universalWrite("suspendCredential", {
+      credentialId,
+      reason: reason.trim() || "Credential blocked",
+    });
+    toast("Card blocked. Use Replace card to issue another one.", "success");
+    if (state.selectedPerson) await selectCredentialPerson(state.selectedPerson.id);
+  }
+
+  function setCardBatchStatus(message, kind) {
+    const node = $("#cardBatchStatus");
+    if (!node) return;
+    node.textContent = message;
+    node.className = "small-note" + (kind ? " " + kind : "");
+  }
+
+  async function prepareCardBatch(type, classKey = "") {
+    if (state.cardBatchBusy) return toast("A card set is already being prepared.", "warning");
+    if (type === "student" && !classKey) return toast("Choose a student class first.", "error");
+    state.cardBatchBusy = true;
+    const label = type === "student" ? classKey + " student" : "all staff";
+    try {
+      setCardBatchStatus("Loading " + label + " records…");
+      const data = await universalRead("people", { personType: type, search: classKey || "" });
+      let people = (data.people || []).map((person) => normalizeCredentialPerson(person, type));
+      if (type === "student" && classKey) {
+        people = people.filter((person) => String(person.group_name || "").toLowerCase() === String(classKey).toLowerCase());
+      }
+      if (!people.length) return toast("No active " + (type === "student" ? "students" : "staff") + " were found for that set.", "warning");
+      const cards = [];
+      const skipped = [];
+      for (let index = 0; index < people.length; index += 1) {
+        const person = people[index];
+        setCardBatchStatus("Preparing " + label + " cards · " + (index + 1) + " of " + people.length + "…");
+        try {
+          const payload = person.personType === "student"
+            ? { studentId: person.id, credentialType: "qr_token", label: person.displayName + " permanent QR ID card" }
+            : { staffId: person.id, credentialType: "qr_token", label: person.displayName + " permanent QR ID card" };
+          const result = await qrWrite("issueQr", payload);
+          if (result.credential?.raw_token) cards.push({ person, raw: result.credential.raw_token });
+          else skipped.push({ person, message: "QR value was not returned" });
+        } catch (error) {
+          skipped.push({ person, message: error.message || "QR card unavailable" });
+        }
+      }
+      if (!cards.length) {
+        setCardBatchStatus("No cards are ready. Older cards may need an explicit replacement first.", "error");
+        return toast("No printable cards were returned for this set.", "error");
+      }
+      await showCardPreview((type === "student" ? "Class " + classKey : "All staff") + " ID cards ready", cards);
+      const suffix = skipped.length ? " " + skipped.length + " older card(s) need Replace card first." : "";
+      setCardBatchStatus(cards.length + " card(s) ready for print." + suffix, skipped.length ? "warning" : "success");
+      toast(cards.length + " ID card(s) are ready. Use Print / save ID cards in the preview.", "success");
+    } finally {
+      state.cardBatchBusy = false;
+    }
   }
 
   async function loadDevices(forCredential = false) {
@@ -563,32 +652,73 @@
     toast("Central Registry roster re-synchronised safely.", "success");
   }
 
-  async function showSecret(title, value, makeQr = false) {
+  function renderIdCardPair(card, index) {
+    const person = card.person || {};
+    const isStudent = person.personType === "student";
+    const kind = isStudent ? "STUDENT" : "STAFF";
+    const reference = text(person.reference);
+    const session = text(state.context?.session, "Current session");
+    const role = person.designation || person.group_name || person.staff_category || "Staff";
+    const department = person.department || person.school_section || person.group_name || "School staff";
+    const house = person.house || "School student";
+    const frontClass = isStudent ? "student-card-front" : "staff-card-front";
+    const fieldMarkup = isStudent
+      ? '<div><dt>ADMISSION NO</dt><dd>' + esc(reference) + '</dd></div><div><dt>CLASS</dt><dd>' + esc(text(person.group_name)) + '</dd></div><div><dt>HOUSE</dt><dd>' + esc(house) + '</dd></div>'
+      : '<div><dt>STAFF NO</dt><dd>' + esc(reference) + '</dd></div><div><dt>ROLE</dt><dd>' + esc(role) + '</dd></div><div><dt>DEPARTMENT</dt><dd>' + esc(department) + '</dd></div>';
+    return '<div class="id-card-pair ' + (isStudent ? "student-card-pair" : "staff-card-pair") + '">' +
+      '<section class="id-side-wrap"><span class="id-side-label">FRONT · ' + kind + ' IDENTITY</span>' +
+        '<article class="id-card-face id-card-front ' + frontClass + '">' +
+          '<header class="id-card-brand"><b class="school-crest"><img src="/assets/wts-school-logo.jpg" alt="Way to Success Standard Schools logo"></b><span>WAY TO SUCCESS STANDARD SCHOOLS<small>IFEDAPO COMMUNITY · EJIGBO</small></span><em class="id-card-type">' + kind + ' ID</em></header>' +
+          '<div class="id-front-body"><div class="avatar id-avatar">' + avatarMarkup(person, isStudent ? "S" : "W") + '</div><div class="id-person-copy"><small>' + kind + ' IDENTITY</small><h2>' + esc(text(person.displayName, "WTS identity")) + '</h2><p>' + esc(isStudent ? "Student attendance profile" : role) + '</p></div></div>' +
+          '<dl class="id-fields">' + fieldMarkup + '</dl>' +
+          '<footer><span>Property of Way to Success Standard Schools</span><b>' + esc(session) + '</b></footer>' +
+        '</article>' +
+      '</section>' +
+      '<section class="id-side-wrap"><span class="id-side-label">BACK · ATTENDANCE QR</span>' +
+        '<article class="id-card-face id-card-back">' +
+          '<header class="id-back-brand"><b class="school-crest"><img src="/assets/wts-school-logo.jpg" alt="Way to Success Standard Schools logo"></b><span>WTS ATTENDANCE<small>PERMANENT QR ID CARD</small></span><em class="id-back-kind">' + kind + '</em></header>' +
+          '<div class="id-back-copy"><small>ATTENDANCE QR</small><h2>SCAN THIS SIDE</h2></div>' +
+          '<div class="qr-frame"><img class="qr-preview" data-card-qr="' + index + '" alt="Secure attendance QR code"></div>' +
+          '<p class="id-qr-hint">KEEP THE FULL CODE AND WHITE QUIET AREA CLEAR</p>' +
+        '</article>' +
+      '</section>' +
+    '</div>';
+  }
+
+  async function showCardPreview(title, cards) {
+    const safeCards = (cards || []).filter((card) => card && card.person && card.raw);
+    if (!safeCards.length) throw new Error("No printable ID card was returned.");
+    const printAreaNode = $("#cardPrintArea");
+    if (!printAreaNode) throw new Error("The ID card preview is unavailable.");
+    if (!window.WTS_VENDOR?.QRCode) throw new Error("The QR renderer is unavailable. Refresh the portal and try again.");
+
+    printAreaNode.innerHTML = safeCards.map((card, index) => renderIdCardPair(card, index)).join("");
     $("#secretTitle").textContent = title;
-    $("#secretIntro").textContent = makeQr ? "Print the front for identity and the back for automatic QR attendance scanning." : "Keep this value safe. It is shown only once.";
-    $("#secretValue").textContent = value;
-    $("#qrPreview").hidden = !makeQr;
-    $("#printQrDialog").hidden = !makeQr;
-    state.lastQr = makeQr ? value : null;
-    state.lastQrPersonId = makeQr ? state.selectedPerson?.id || null : null;
-    if (makeQr && state.selectedPerson) {
-      const person = state.selectedPerson;
-      const isStudent = person.personType === "student";
-      $("#printAvatar").innerHTML = avatarMarkup(person);
-      $("#printKind").textContent = isStudent ? "STUDENT" : "STAFF";
-      $("#printName").textContent = person.displayName;
-      $("#printNumberLabel").textContent = isStudent ? "STUDENT NUMBER" : "STAFF NUMBER";
-      $("#printNumber").textContent = person.reference || "—";
-      $("#printGroupLabel").textContent = isStudent ? "CLASS" : "POSITION / DEPARTMENT";
-      $("#printGroup").textContent = person.group_name || "—";
-      $("#printSession").textContent = state.context?.session || "Current";
-      $("#printBackName").textContent = person.displayName;
-      $("#printBackNumber").textContent = person.reference || "—";
+    $("#secretIntro").textContent = safeCards.length === 1
+      ? "This card uses the person's permanent attendance QR code. Print the front and the large QR-only back."
+      : safeCards.length + " cards are ready. Each person keeps one permanent attendance QR code.";
+    $("#secretValue").textContent = "";
+    $("#copySecret").hidden = true;
+    $("#printQrDialog").hidden = false;
+    $("#printQrDialog").textContent = safeCards.length === 1 ? "Print / save ID card" : "Print / save ID cards";
+
+    for (let index = 0; index < safeCards.length; index += 1) {
+      const source = await window.WTS_VENDOR.QRCode.toDataURL(safeCards[index].raw, {
+        width: 1000,
+        margin: 4,
+        errorCorrectionLevel: "M",
+        color: { dark: "#0b1f3a", light: "#ffffff" },
+      });
+      const image = printAreaNode.querySelector('[data-card-qr="' + index + '"]');
+      if (image) image.src = source;
     }
-    if (makeQr && window.WTS_VENDOR?.QRCode) {
-      try { $("#qrPreview").src = await window.WTS_VENDOR.QRCode.toDataURL(value, { width: 420, margin: 2, errorCorrectionLevel: "M" }); } catch { $("#qrPreview").hidden = true; }
-    }
-    $("#secretDialog").showModal();
+
+    state.lastQrCards = safeCards;
+    state.lastQr = safeCards.length === 1 ? safeCards[0].raw : null;
+    state.lastQrPersonId = safeCards.length === 1 ? safeCards[0].person.id : null;
+    const dialog = $("#secretDialog");
+    if (dialog.open) dialog.close();
+    dialog.showModal();
   }
 
   function printArea(className) {
@@ -600,14 +730,20 @@
     $$(".nav").forEach((button) => button.addEventListener("click", () => openView(button.dataset.view)));
     document.addEventListener("click", (event) => {
       const go = event.target.closest("[data-go]");
-      if (go) openView(go.dataset.go);
+      if (go) { openView(go.dataset.go); return; }
+      const showCredential = event.target.closest("[data-show-credential]");
+      if (showCredential) { issueQr().catch((error) => toast(error.message, "error")); return; }
+      const replaceCredential = event.target.closest("[data-replace-credential]");
+      if (replaceCredential) { replaceQrCard(replaceCredential.dataset.replaceCredential).catch((error) => toast(error.message, "error")); return; }
+      const blockCredentialButton = event.target.closest("[data-block-credential]");
+      if (blockCredentialButton) { blockCredential(blockCredentialButton.dataset.blockCredential).catch((error) => toast(error.message, "error")); return; }
       const person = event.target.closest("[data-person-id]");
-      if (person) selectCredentialPerson(person.dataset.personId).catch((error) => toast(error.message, "error"));
+      if (person) { selectCredentialPerson(person.dataset.personId).catch((error) => toast(error.message, "error")); return; }
       const mapPerson = event.target.closest("[data-map-person-id]");
-      if (mapPerson) mapSelectedImportRow(mapPerson.dataset.mapPersonId).catch((error) => toast(error.message, "error"));
+      if (mapPerson) { mapSelectedImportRow(mapPerson.dataset.mapPersonId).catch((error) => toast(error.message, "error")); return; }
       const credential = event.target.closest("[data-suspend-credential]");
-      if (credential) universalWrite("suspendCredential", { credentialId: credential.dataset.suspendCredential, reason: window.prompt("Reason for suspension:", "Lost, damaged or replaced") || "Credential suspended" }).then(() => { toast("Credential suspended.", "success"); return selectCredentialPerson(state.selectedPerson.id); }).catch((error) => toast(error.message, "error"));
-      if (event.target.closest("[data-review]")) reviewCorrection(event).catch((error) => toast(error.message, "error"));
+      if (credential) { blockCredential(credential.dataset.suspendCredential).catch((error) => toast(error.message, "error")); return; }
+      if (event.target.closest("[data-review]")) { reviewCorrection(event).catch((error) => toast(error.message, "error")); return; }
       const importRow = event.target.closest("[data-import-row]");
       if (importRow) { state.import.selectedRowId = importRow.dataset.importRow; renderImportPreview(); }
     });
@@ -618,8 +754,10 @@
     $("#searchCredentials").onclick = () => loadCredentialPeople().catch((error) => toast(error.message, "error"));
     $("#credentialSearch").onkeydown = (event) => { if (event.key === "Enter") loadCredentialPeople().catch((error) => toast(error.message, "error")); };
     $("#issueQr").onclick = () => issueQr().catch((error) => toast(error.message, "error"));
+    $("#downloadClassCards").onclick = () => prepareCardBatch("student", $("#cardBatchClass").value).catch((error) => toast(error.message, "error"));
+    $("#downloadStaffCards").onclick = () => prepareCardBatch("staff").catch((error) => toast(error.message, "error"));
     $("#credentialAssignForm").onsubmit = (event) => assignCredential(event).catch((error) => toast(error.message, "error"));
-    $("#printQr").onclick = () => state.lastQr && state.lastQrPersonId === state.selectedPerson?.id ? showSecret("Two-sided ID card ready", state.lastQr, true) : toast("Create this person's QR code before printing.", "error");
+    $("#printQr").onclick = () => issueQr().catch((error) => toast(error.message, "error"));
     $("#addDevice").onclick = openDeviceSetup;
     $("#deviceForm").onsubmit = (event) => addDevice(event).catch((error) => toast(error.message, "error"));
     $("#cancelDevice").onclick = () => $("#deviceDialog").close();
