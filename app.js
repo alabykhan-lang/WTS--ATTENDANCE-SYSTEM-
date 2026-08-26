@@ -652,34 +652,42 @@
     toast("Central Registry roster re-synchronised safely.", "success");
   }
 
-  function renderIdCardPair(card, index) {
+
+  function renderIdCardPair(card, index, { inlineQr = false } = {}) {
     const person = card.person || {};
     const isStudent = person.personType === "student";
-    const kind = isStudent ? "STUDENT" : "STAFF";
-    const reference = text(person.reference);
+    const family = isStudent ? "student" : "staff";
+    const reference = text(person.reference, "—");
     const session = text(state.context?.session, "Current session");
-    const role = person.designation || person.group_name || person.staff_category || "Staff";
-    const department = person.department || person.school_section || person.group_name || "School staff";
-    const house = person.house || "School student";
-    const frontClass = isStudent ? "student-card-front" : "staff-card-front";
-    const fieldMarkup = isStudent
-      ? '<div><dt>ADMISSION NO</dt><dd>' + esc(reference) + '</dd></div><div><dt>CLASS</dt><dd>' + esc(text(person.group_name)) + '</dd></div><div><dt>HOUSE</dt><dd>' + esc(house) + '</dd></div>'
-      : '<div><dt>STAFF NO</dt><dd>' + esc(reference) + '</dd></div><div><dt>ROLE</dt><dd>' + esc(role) + '</dd></div><div><dt>DEPARTMENT</dt><dd>' + esc(department) + '</dd></div>';
-    return '<div class="id-card-pair ' + (isStudent ? "student-card-pair" : "staff-card-pair") + '">' +
-      '<section class="id-side-wrap"><span class="id-side-label">FRONT · ' + kind + ' IDENTITY</span>' +
-        '<article class="id-card-face id-card-front ' + frontClass + '">' +
-          '<header class="id-card-brand"><b class="school-crest"><img src="/assets/wts-school-logo.jpg" alt="Way to Success Standard Schools logo"></b><span>WAY TO SUCCESS STANDARD SCHOOLS<small>IFEDAPO COMMUNITY · EJIGBO</small></span><em class="id-card-type">' + kind + ' ID</em></header>' +
-          '<div class="id-front-body"><div class="avatar id-avatar">' + avatarMarkup(person, isStudent ? "S" : "W") + '</div><div class="id-person-copy"><small>' + kind + ' IDENTITY</small><h2>' + esc(text(person.displayName, "WTS identity")) + '</h2><p>' + esc(isStudent ? "Student attendance profile" : role) + '</p></div></div>' +
-          '<dl class="id-fields">' + fieldMarkup + '</dl>' +
-          '<footer><span>Property of Way to Success Standard Schools</span><b>' + esc(session) + '</b></footer>' +
-        '</article>' +
+    const role = text(
+      person.designation || person.role || person.group_name || person.staff_category,
+      "Staff",
+    );
+    const department = text(person.department || person.school_section, "—");
+    const group = text(person.group_name, "—");
+    const house = text(person.house, "—");
+    const qrImage = inlineQr && card.qrDataUrl
+      ? '<img class="qr-preview" data-card-qr="' + index + '" src="' + esc(card.qrDataUrl) + '" alt="Secure attendance QR code">'
+      : '<img class="qr-preview" data-card-qr="' + index + '" alt="Secure attendance QR code">';
+    const frontMarkup = isStudent
+      ? '<header class="vertical-card-brand"><b class="school-crest"><img src="/assets/wts-school-logo.jpg" alt="Way to Success Standard Schools logo"></b><span>WAY TO SUCCESS STANDARD SCHOOLS<small>IFEDAPO COMMUNITY · EJIGBO</small></span></header>' +
+        '<div class="vertical-card-portrait student-portrait"><div class="id-avatar">' + avatarMarkup(person, "S") + '</div></div>' +
+        '<div class="vertical-card-info student-card-info"><h2>' + esc(text(person.displayName, "WTS student")) + '</h2><p class="vertical-card-subtitle">STUDENT</p><dl class="vertical-card-fields"><div><dt>ADMISSION NO.</dt><dd>' + esc(reference) + '</dd></div><div><dt>CLASS</dt><dd>' + esc(group) + '</dd></div><div><dt>HOUSE</dt><dd>' + esc(house) + '</dd></div></dl></div>' +
+        '<footer class="vertical-card-footer"><span>WAY TO SUCCESS</span><b>' + esc(session) + '</b></footer>'
+      : '<header class="vertical-card-brand"><b class="school-crest"><img src="/assets/wts-school-logo.jpg" alt="Way to Success Standard Schools logo"></b><span>WAY TO SUCCESS STANDARD SCHOOLS<small>IFEDAPO COMMUNITY · EJIGBO</small></span></header>' +
+        '<div class="vertical-card-portrait staff-portrait"><div class="id-avatar">' + avatarMarkup(person, "W") + '</div></div>' +
+        '<div class="vertical-card-info staff-card-info"><h2>' + esc(text(person.displayName, "WTS staff")) + '</h2><p class="vertical-card-role">' + esc(role) + '</p><dl class="vertical-card-fields"><div><dt>STAFF NUMBER</dt><dd>' + esc(reference) + '</dd></div><div><dt>DEPARTMENT</dt><dd>' + esc(department) + '</dd></div></dl></div>' +
+        '<footer class="vertical-card-footer"><span>WAY TO SUCCESS</span><b>' + esc(session) + '</b></footer>';
+    return '<div class="id-card-pair ' + family + '-card-pair">' +
+      '<section class="id-side-wrap"><span class="id-side-label">FRONT · ' + (isStudent ? "STUDENT" : "TEACHER") + '</span>' +
+        '<article class="id-card-face id-card-front ' + (isStudent ? "student-card-front" : "staff-card-front") + '">' + frontMarkup + '</article>' +
       '</section>' +
-      '<section class="id-side-wrap"><span class="id-side-label">BACK · ATTENDANCE QR</span>' +
-        '<article class="id-card-face id-card-back">' +
-          '<header class="id-back-brand"><b class="school-crest"><img src="/assets/wts-school-logo.jpg" alt="Way to Success Standard Schools logo"></b><span>WTS ATTENDANCE<small>PERMANENT QR ID CARD</small></span><em class="id-back-kind">' + kind + '</em></header>' +
-          '<div class="id-back-copy"><small>ATTENDANCE QR</small><h2>SCAN THIS SIDE</h2></div>' +
-          '<div class="qr-frame"><img class="qr-preview" data-card-qr="' + index + '" alt="Secure attendance QR code"></div>' +
-          '<p class="id-qr-hint">KEEP THE FULL CODE AND WHITE QUIET AREA CLEAR</p>' +
+      '<section class="id-side-wrap"><span class="id-side-label">BACK · QR ONLY</span>' +
+        '<article class="id-card-face id-card-back ' + family + '-card-back">' +
+          '<header class="vertical-back-brand"><b class="school-crest"><img src="/assets/wts-school-logo.jpg" alt="Way to Success Standard Schools logo"></b><span>WTS ATTENDANCE<small>SCAN FOR ATTENDANCE</small></span></header>' +
+          '<div class="vertical-qr-copy"><small>ATTENDANCE QR CODE</small><h2>SHOW THIS SIDE TO THE SCANNER</h2></div>' +
+          '<div class="qr-frame">' + qrImage + '</div>' +
+          '<p class="id-qr-hint">KEEP THE CODE CLEAR</p>' +
         '</article>' +
       '</section>' +
     '</div>';
@@ -692,38 +700,79 @@
     if (!printAreaNode) throw new Error("The ID card preview is unavailable.");
     if (!window.WTS_VENDOR?.QRCode) throw new Error("The QR renderer is unavailable. Refresh the portal and try again.");
 
-    printAreaNode.innerHTML = safeCards.map((card, index) => renderIdCardPair(card, index)).join("");
-    $("#secretTitle").textContent = title;
-    $("#secretIntro").textContent = safeCards.length === 1
-      ? "This card uses the person's permanent attendance QR code. Print the front and the large QR-only back."
-      : safeCards.length + " cards are ready. Each person keeps one permanent attendance QR code.";
-    $("#secretValue").textContent = "";
-    $("#copySecret").hidden = true;
-    $("#printQrDialog").hidden = false;
-    $("#printQrDialog").textContent = safeCards.length === 1 ? "Print / save ID card" : "Print / save ID cards";
-
-    for (let index = 0; index < safeCards.length; index += 1) {
-      const source = await window.WTS_VENDOR.QRCode.toDataURL(safeCards[index].raw, {
-        width: 1000,
-        margin: 4,
+    const preparedCards = [];
+    for (const card of safeCards) {
+      const qrDataUrl = await window.WTS_VENDOR.QRCode.toDataURL(card.raw, {
+        width: 1200,
+        margin: 5,
         errorCorrectionLevel: "M",
         color: { dark: "#0b1f3a", light: "#ffffff" },
       });
-      const image = printAreaNode.querySelector('[data-card-qr="' + index + '"]');
-      if (image) image.src = source;
+      preparedCards.push({ ...card, qrDataUrl });
     }
 
-    state.lastQrCards = safeCards;
-    state.lastQr = safeCards.length === 1 ? safeCards[0].raw : null;
-    state.lastQrPersonId = safeCards.length === 1 ? safeCards[0].person.id : null;
+    printAreaNode.innerHTML = preparedCards.map((card, index) => renderIdCardPair(card, index, { inlineQr: true })).join("");
+    $("#secretTitle").textContent = title;
+    $("#secretIntro").textContent = preparedCards.length === 1
+      ? "The portrait front and QR-only back are ready. The same permanent code can be printed again."
+      : preparedCards.length + " complete front-and-back cards are ready in this print document.";
+    $("#secretValue").textContent = "";
+    $("#copySecret").hidden = true;
+    $("#printQrDialog").hidden = false;
+    $("#printQrDialog").textContent = preparedCards.length === 1 ? "Print / save ID card" : "Print / save all ID cards";
+
+    state.lastQrCards = preparedCards;
+    state.lastQr = preparedCards.length === 1 ? preparedCards[0].raw : null;
+    state.lastQrPersonId = preparedCards.length === 1 ? preparedCards[0].person.id : null;
     const dialog = $("#secretDialog");
     if (dialog.open) dialog.close();
     dialog.showModal();
   }
 
+  async function printCardBatch() {
+    const cards = (state.lastQrCards || []).filter((card) => card?.person && card?.qrDataUrl);
+    if (!cards.length) return toast("Prepare the ID card set first.", "warning");
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      printArea("print-qr");
+      return;
+    }
+
+    const printBase = esc(window.location.origin + "/");
+    const stylesheet = esc(window.location.origin + "/styles.css");
+    const markup = cards.map((card, index) => renderIdCardPair(card, index, { inlineQr: true })).join("");
+    printWindow.document.open();
+    printWindow.document.write(
+      '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>WTS ID cards</title><base href="' + printBase + '"><link rel="stylesheet" href="' + stylesheet + '"></head><body class="print-qr"><main class="id-print-sheet"><div class="id-card-print-area">' + markup + '</div></main></body></html>',
+    );
+    printWindow.document.close();
+
+    const styleLinks = [...printWindow.document.querySelectorAll('link[rel="stylesheet"]')];
+    const styleReady = styleLinks.map((link) => new Promise((resolve) => {
+      if (link.sheet) return resolve();
+      link.addEventListener("load", resolve, { once: true });
+      link.addEventListener("error", resolve, { once: true });
+    }));
+    const imageReady = [...printWindow.document.images].map((image) => {
+      if (image.complete) return Promise.resolve();
+      return new Promise((resolve) => {
+        image.addEventListener("load", resolve, { once: true });
+        image.addEventListener("error", resolve, { once: true });
+      });
+    });
+    await Promise.all([...styleReady, ...imageReady]);
+    printWindow.addEventListener("afterprint", () => window.setTimeout(() => printWindow.close(), 250), { once: true });
+    printWindow.focus();
+    window.setTimeout(() => printWindow.print(), 120);
+  }
+
   function printArea(className) {
     document.body.classList.add(className);
-    window.setTimeout(() => { window.print(); window.setTimeout(() => document.body.classList.remove(className), 300); }, 20);
+    window.setTimeout(() => {
+      window.print();
+      window.setTimeout(() => document.body.classList.remove(className), 300);
+    }, 20);
   }
 
   function wireEvents() {
@@ -779,7 +828,7 @@
     $("#closeSecret").onclick = () => $("#secretDialog").close();
     $("#closeSecretButton").onclick = () => $("#secretDialog").close();
     $("#copySecret").onclick = () => navigator.clipboard?.writeText($("#secretValue").textContent).then(() => toast("Copied to clipboard.", "success"));
-    $("#printQrDialog").onclick = () => printArea("print-qr");
+    $("#printQrDialog").onclick = () => printCardBatch().catch((error) => toast(error.message, "error"));
     $("#reportFrom").value = monthStart();
     $("#reportTo").value = todayIso();
   }
