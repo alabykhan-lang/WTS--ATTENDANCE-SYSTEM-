@@ -64,7 +64,8 @@ test("credential office and scanner are restricted to QR and NFC", async () => {
     readFile(new URL("../app.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(html, /Generate QR pass/);
+  assert.match(html, /Show \/ download ID card/);
+  assert.match(html, /permanent attendance QR/);
   assert.match(html, /value="nfc_uid"/);
   assert.doesNotMatch(html, /rfid_uid|fingerprint_device_user_id|temporary_pass/);
   assert.match(scannerHtml, /value="qr"/);
@@ -136,17 +137,47 @@ test("printable identity card has separate front identity and back QR faces", as
     readFile(new URL("../styles.css", import.meta.url), "utf8"),
   ]);
 
-  assert.match(html, /id-card-face id-card-front/);
-  assert.match(html, /id-card-face id-card-back/);
-  assert.match(html, /id="printAvatar"/);
-  assert.match(html, /id="printNumber"/);
-  assert.match(html, /id="qrPreview"/);
-  assert.match(html, /Print front and back/);
+  assert.match(html, /id="cardPrintArea"/);
+  assert.match(source, /id-card-face id-card-front/);
+  assert.match(source, /id-card-face id-card-back/);
+  assert.match(source, /renderIdCardPair/);
+  assert.match(source, /data-card-qr/);
+  assert.match(html, /Print \/ save ID card/);
   assert.match(source, /person\.reference/);
   assert.match(source, /person\.group_name/);
   assert.match(html, /85\.60 × 53\.98 MM/);
   assert.match(html, /assets\/wts-school-logo\.jpg/);
   assert.match(styles, /width:85\.6mm;height:53\.98mm/);
+});
+
+test("ID-card controls reuse permanent QR values and keep replacement explicit", async () => {
+  const [html, source, rpcSource] = await Promise.all([
+    readFile(new URL("../index.html", import.meta.url), "utf8"),
+    readFile(new URL("../app.js", import.meta.url), "utf8"),
+    readFile(new URL("../api/rpc.js", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(html, /ONE QR PER PERSON/);
+  assert.match(html, /Show \/ download class cards/);
+  assert.match(html, /Show \/ download all staff cards/);
+  assert.match(source, /qrWrite\("issueQr"/);
+  assert.match(source, /qrWrite\("replaceQr"/);
+  assert.match(source, /data-replace-credential/);
+  assert.doesNotMatch(source, /showSecret\(/);
+  assert.match(rpcSource, /attendance_qr_card_api/);
+});
+
+test("stable QR storage keeps raw values encrypted and replacement explicit", async () => {
+  const migration = await readFile(new URL("../supabase/migrations/20260826120000_stable_qr_id_cards.sql", import.meta.url), "utf8");
+
+  assert.match(migration, /add column if not exists qr_secret_id uuid/);
+  assert.match(migration, /vault\.create_secret/);
+  assert.match(migration, /attendance_qr_card_api/);
+  assert.match(migration, /p_action not in \('issueQr','replaceQr'\)/);
+  assert.match(migration, /QR_REPRINT_UNAVAILABLE/);
+  assert.match(migration, /QR_CREDENTIAL_REPLACED/);
+  assert.match(migration, /one_active_qr_per_person/);
+  assert.doesNotMatch(migration, /raw_secret.*metadata|metadata.*raw_secret/i);
 });
 
 test("universal Attendance requests prefer the current RPC before compatibility fallbacks", async () => {
