@@ -89,7 +89,7 @@
         <article class="card card-bulk-tools">
           <div class="card-heading"><div><small class="eyebrow">BULK PRINTING</small><h2>Show a set of ID cards</h2><p>Choose one class for students, or prepare every staff card together. Existing QR codes are reused; a new code is created only for a replacement.</p></div><span class="badge ready">ONE QR PER PERSON</span></div>
           <div class="bulk-card-toolbar"><label class="bulk-class-field">Student class<select id="cardBatchClass"><option value="">Choose a class</option></select></label><div class="button-row"><button class="primary" id="downloadClassCards" type="button">Show / download class cards</button><button class="ghost" id="downloadStaffCards" type="button">Show / download all staff cards</button></div></div>
-          <p id="cardBatchStatus" class="small-note">The preview is print-ready. Use “Print / save ID cards” to send the front and back to your printer or save a PDF.</p>
+          <p id="cardBatchStatus" class="small-note">The preview and PDF contain every selected card, with the portrait front and QR-only back rendered together.</p>
         </article>
         <div class="two-column credential-layout"><article class="card"><div class="card-heading"><div><small class="eyebrow">SCHOOL RECORDS</small><h2>Find one person</h2></div></div><div class="toolbar compact-toolbar"><label class="grow">Name or number<input id="credentialSearch" placeholder="Type a name, admission number, or staff number"></label><label>Who<select id="credentialPersonType"><option value="student">Students</option><option value="staff">Staff</option></select></label><button class="ghost" id="searchCredentials">Find</button></div><p class="small-note">The QR code is permanent for this person across terms, sessions, and class changes.</p><div id="credentialPeople" class="people-list"></div></article>
           <article class="card detail-panel"><div id="credentialEmpty" class="empty">Choose a student or staff member to prepare an ID card.</div><div id="credentialDetail" hidden>
@@ -136,7 +136,7 @@
 
   <dialog id="secretDialog"><div class="secret-box id-print-sheet"><button class="dialog-close" id="closeSecret" aria-label="Close">×</button>
     <div id="cardPrintArea" class="id-card-print-area"></div>
-    <aside class="secret-controls"><h2 id="secretTitle">Two-sided ID card ready</h2><p id="secretIntro">Print the front for identity and the back for automatic QR attendance scanning.</p><p class="id-standard-size">CR80 STANDARD CARD · 85.60 × 53.98 MM</p><pre id="secretValue" hidden></pre><div class="dialog-actions"><button class="ghost" id="copySecret" hidden>Copy value</button><button class="ghost" id="printQrDialog">Print / save ID card</button><button class="primary" id="closeSecretButton">Done</button></div></aside>
+    <aside class="secret-controls"><h2 id="secretTitle">Portrait ID card ready</h2><p id="secretIntro">The preview and the saved PDF use the same portrait front and QR-only back design.</p><p class="id-standard-size">CR80 PORTRAIT CARD · 53.98 × 85.60 MM</p><pre id="secretValue" hidden></pre><div class="dialog-actions"><button class="ghost" id="copySecret" hidden>Copy value</button><button class="ghost" id="printQrDialog">Print / save ID card</button><button class="primary" id="closeSecretButton">Done</button></div></aside>
   </div></dialog>
 
   <dialog id="deviceDialog"><form id="deviceForm" class="setup-dialog">
