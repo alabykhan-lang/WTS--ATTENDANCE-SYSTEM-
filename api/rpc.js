@@ -49,7 +49,11 @@ export default async function handler(req, res) {
   let result;
   if (OPERATOR_RPCS.has(name)) {
     if (!action || action.length > 120) return sendJson(res, { ok: false, code: "ATTENDANCE_ACTION_REQUIRED" }, 400);
-    const rpcName = RPC_COMPATIBILITY_ALIASES[name] || name;
+    const rpcName =
+      name === "attendance_universal_admin_write_api" &&
+      ["issueQr", "replaceQr"].includes(action)
+        ? "attendance_qr_card_api"
+        : RPC_COMPATIBILITY_ALIASES[name] || name;
     result = await supabaseRpc(rpcName, { p_client_code: local.clientCode, p_client_secret: local.clientSecret, p_action: action, p_payload: payload });
   } else if (name === "attendance_roster_sync_status_api") {
     result = await supabaseRpc(name, { p_session_id: central.session.sessionId, p_session_secret: central.session.sessionSecret });
