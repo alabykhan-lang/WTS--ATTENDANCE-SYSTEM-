@@ -84,16 +84,21 @@
       </section>
 
       <section class="view" id="view-credentials">
-        <div class="section-head"><div><small class="eyebrow">SCHOOL OFFICE</small><h2>Prepare an ID card</h2><p>Find a student or staff member already in the school records, then create a QR code or link an NFC tap card.</p></div></div>
-        <div class="credential-steps"><span class="active"><b>1</b>Find person</span><span><b>2</b>Issue QR or link NFC</span><span><b>3</b>Print and hand over</span></div>
-        <div class="two-column credential-layout"><article class="card"><div class="card-heading"><div><small class="eyebrow">SCHOOL RECORDS</small><h2>Find one person</h2></div></div><div class="toolbar compact-toolbar"><label class="grow">Name or number<input id="credentialSearch" placeholder="Type a name, admission number, or staff number"></label><label>Who<select id="credentialPersonType"><option value="student">Students</option><option value="staff">Staff</option></select></label><button class="ghost" id="searchCredentials">Find</button></div><p class="small-note">Create and print a QR code here. To link an NFC card, tap or read that physical card once.</p><div id="credentialPeople" class="people-list"></div></article>
+        <div class="section-head"><div><small class="eyebrow">SCHOOL OFFICE</small><h2>Issue a permanent ID card</h2><p>Every student and staff member keeps one attendance QR code. Show the same card again whenever you need to reprint it.</p></div></div>
+        <div class="credential-steps"><span class="active"><b>1</b>Find person</span><span><b>2</b>Show the ID card</span><span><b>3</b>Print front and back</span></div>
+        <article class="card card-bulk-tools">
+          <div class="card-heading"><div><small class="eyebrow">BULK PRINTING</small><h2>Show a set of ID cards</h2><p>Choose one class for students, or prepare every staff card together. Existing QR codes are reused; a new code is created only for a replacement.</p></div><span class="badge ready">ONE QR PER PERSON</span></div>
+          <div class="bulk-card-toolbar"><label class="bulk-class-field">Student class<select id="cardBatchClass"><option value="">Choose a class</option></select></label><div class="button-row"><button class="primary" id="downloadClassCards" type="button">Show / download class cards</button><button class="ghost" id="downloadStaffCards" type="button">Show / download all staff cards</button></div></div>
+          <p id="cardBatchStatus" class="small-note">The preview is print-ready. Use “Print / save ID cards” to send the front and back to your printer or save a PDF.</p>
+        </article>
+        <div class="two-column credential-layout"><article class="card"><div class="card-heading"><div><small class="eyebrow">SCHOOL RECORDS</small><h2>Find one person</h2></div></div><div class="toolbar compact-toolbar"><label class="grow">Name or number<input id="credentialSearch" placeholder="Type a name, admission number, or staff number"></label><label>Who<select id="credentialPersonType"><option value="student">Students</option><option value="staff">Staff</option></select></label><button class="ghost" id="searchCredentials">Find</button></div><p class="small-note">The QR code is permanent for this person across terms, sessions, and class changes.</p><div id="credentialPeople" class="people-list"></div></article>
           <article class="card detail-panel"><div id="credentialEmpty" class="empty">Choose a student or staff member to prepare an ID card.</div><div id="credentialDetail" hidden>
             <div class="person-heading"><div class="avatar" id="credentialAvatar">W</div><div><small class="eyebrow" id="credentialKind">CENTRAL REGISTRY</small><h2 id="credentialName"></h2><p id="credentialMeta"></p></div></div>
             <div class="credential-methods">
-              <section class="credential-method"><div class="method-heading"><span>QR</span><div><b>Secure QR pass</b><small>Generate, preview and print on the WTS ID card.</small></div></div><div class="button-row"><button class="primary" id="issueQr">Generate QR pass</button><button class="ghost" id="printQr">Print last pass</button></div></section>
+              <section class="credential-method"><div class="method-heading"><span>QR</span><div><b>Permanent attendance QR</b><small>Show the same code again or print the differentiated front and large QR back.</small></div></div><div class="button-row"><button class="primary" id="issueQr" type="button">Show / download ID card</button><button class="ghost" id="printQr" type="button">Show card again</button></div></section>
               <section class="credential-method"><div class="method-heading"><span>NFC</span><div><b>Link physical card</b><small>Tap or read the card once at the central office.</small></div></div><form id="credentialAssignForm" class="stack-form credential-form"><input id="credentialType" type="hidden" value="nfc_uid"><label>Card UID<input id="credentialRaw" autocomplete="off" required placeholder="Tap card or scan with USB NFC reader"></label><div class="form-grid"><label>Card label<input id="credentialLabel" placeholder="Main school ID card"></label><label>Issuing reader (optional)<select id="credentialDevice"><option value="">No reader selected</option></select></label></div><button class="primary" type="submit">Link NFC card</button></form></section>
             </div>
-            <div class="card-subheading"><h3>QR codes and tap cards</h3><span class="muted">Secret values are not shown again.</span></div><div id="credentialList" class="credential-list"></div>
+            <div class="card-subheading"><h3>Attendance cards</h3><span class="muted">Block a lost card, then replace it explicitly.</span></div><div id="credentialList" class="credential-list"></div>
           </div></article></div>
       </section>
 
@@ -130,22 +135,8 @@
   </div>
 
   <dialog id="secretDialog"><div class="secret-box id-print-sheet"><button class="dialog-close" id="closeSecret" aria-label="Close">×</button>
-    <div class="id-card-pair">
-      <section class="id-side-wrap"><span class="id-side-label">FRONT · IDENTITY</span><article class="id-card-face id-card-front">
-        <header class="id-card-brand"><b class="school-crest"><img src="/assets/wts-school-logo.jpg" alt="Way to Success Standard Schools logo"></b><span>WAY TO SUCCESS STANDARD SCHOOLS<small>IFEDAPO COMMUNITY, EJIGBO</small></span></header>
-        <div class="id-front-body"><div class="avatar id-avatar" id="printAvatar">W</div><div class="id-person-copy"><small id="printKind">STUDENT</small><h2 id="printName">WTS identity</h2><p>Official School Identity Card</p></div></div>
-        <dl class="id-fields"><div><dt id="printNumberLabel">STUDENT NUMBER</dt><dd id="printNumber">—</dd></div><div><dt id="printGroupLabel">CLASS</dt><dd id="printGroup">—</dd></div><div><dt>SESSION</dt><dd id="printSession">—</dd></div></dl>
-        <footer><span>Property of Way to Success Standard Schools</span><b>WTS</b></footer>
-      </article></section>
-      <section class="id-side-wrap"><span class="id-side-label">BACK · ATTENDANCE QR</span><article class="id-card-face id-card-back">
-        <header class="id-back-brand"><b class="school-crest"><img src="/assets/wts-school-logo.jpg" alt=""></b><span>WAY TO SUCCESS STANDARD SCHOOLS</span></header>
-        <div class="id-back-copy"><small>ATTENDANCE QR CODE</small><h2>Show this side to the scanner</h2></div>
-        <img id="qrPreview" class="qr-preview" alt="Secure attendance QR code" hidden>
-        <div class="id-back-person"><b id="printBackName">WTS identity</b><span id="printBackNumber">—</span></div>
-        <p class="id-card-note">This card is for school identification and attendance. If found, return it to the school office.</p>
-      </article></section>
-    </div>
-    <aside class="secret-controls"><h2 id="secretTitle">Two-sided ID card ready</h2><p id="secretIntro">Print the front for identity and the back for automatic QR attendance scanning.</p><p class="id-standard-size">CR80 STANDARD CARD · 85.60 × 53.98 MM</p><pre id="secretValue" hidden></pre><div class="dialog-actions"><button class="ghost" id="copySecret" hidden>Copy value</button><button class="ghost" id="printQrDialog">Print front and back</button><button class="primary" id="closeSecretButton">Done</button></div></aside>
+    <div id="cardPrintArea" class="id-card-print-area"></div>
+    <aside class="secret-controls"><h2 id="secretTitle">Two-sided ID card ready</h2><p id="secretIntro">Print the front for identity and the back for automatic QR attendance scanning.</p><p class="id-standard-size">CR80 STANDARD CARD · 85.60 × 53.98 MM</p><pre id="secretValue" hidden></pre><div class="dialog-actions"><button class="ghost" id="copySecret" hidden>Copy value</button><button class="ghost" id="printQrDialog">Print / save ID card</button><button class="primary" id="closeSecretButton">Done</button></div></aside>
   </div></dialog>
 
   <dialog id="deviceDialog"><form id="deviceForm" class="setup-dialog">
