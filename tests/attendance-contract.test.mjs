@@ -130,7 +130,7 @@ test("scanner opens as an always-ready camera with a bundled decoder fallback", 
   assert.match(manifest, /"display": "standalone"/);
 });
 
-test("printable identity card has separate front identity and back QR faces", async () => {
+test("printable identity card has separate portrait fronts and a QR-only back", async () => {
   const [html, source, styles] = await Promise.all([
     readFile(new URL("../index.html", import.meta.url), "utf8"),
     readFile(new URL("../app.js", import.meta.url), "utf8"),
@@ -142,12 +142,17 @@ test("printable identity card has separate front identity and back QR faces", as
   assert.match(source, /id-card-face id-card-back/);
   assert.match(source, /renderIdCardPair/);
   assert.match(source, /data-card-qr/);
+  assert.match(source, /staff-card-front/);
+  assert.match(source, /student-card-front/);
+  assert.match(source, /BACK · QR ONLY/);
+  assert.match(source, /printCardBatch/);
+  assert.match(source, /preparedCards\.map\(\(card, index\) => renderIdCardPair/);
   assert.match(html, /Print \/ save ID card/);
   assert.match(source, /person\.reference/);
   assert.match(source, /person\.group_name/);
-  assert.match(html, /85\.60 × 53\.98 MM/);
+  assert.match(html, /53\.98 × 85\.60 MM/);
   assert.match(html, /assets\/wts-school-logo\.jpg/);
-  assert.match(styles, /width:85\.6mm;height:53\.98mm/);
+  assert.match(styles, /width:53\.98mm;height:85\.6mm/);
 });
 
 test("ID-card controls reuse permanent QR values and keep replacement explicit", async () => {
