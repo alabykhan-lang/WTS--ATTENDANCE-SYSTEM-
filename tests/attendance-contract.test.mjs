@@ -64,8 +64,8 @@ test("credential office and scanner are restricted to QR and NFC", async () => {
     readFile(new URL("../app.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(html, /Show \/ download ID card/);
-  assert.match(html, /permanent attendance QR/);
+  assert.match(html, /Show \/ download QR code/);
+  assert.match(html, /Permanent attendance QR/);
   assert.match(html, /value="nfc_uid"/);
   assert.doesNotMatch(html, /rfid_uid|fingerprint_device_user_id|temporary_pass/);
   assert.match(scannerHtml, /value="qr"/);
@@ -82,7 +82,7 @@ test("record intake explains connected, interrupted, and saved-file paths in pla
   assert.match(html, /\.csv,\.xlsx,\.xls,\.txt,\.tsv/);
 });
 
-test("ID-card search and device setup use the universal permission-scoped flow", async () => {
+test("QR-code search and device setup use the universal permission-scoped flow", async () => {
   const [html, appSource] = await Promise.all([
     readFile(new URL("../index.html", import.meta.url), "utf8"),
     readFile(new URL("../app.js", import.meta.url), "utf8"),
@@ -130,32 +130,34 @@ test("scanner opens as an always-ready camera with a bundled decoder fallback", 
   assert.match(manifest, /"display": "standalone"/);
 });
 
-test("printable identity card has separate portrait fronts and a QR-only back", async () => {
+test("printable QR output contains a complete labeled code for every person", async () => {
   const [html, source, styles] = await Promise.all([
     readFile(new URL("../index.html", import.meta.url), "utf8"),
     readFile(new URL("../app.js", import.meta.url), "utf8"),
     readFile(new URL("../styles.css", import.meta.url), "utf8"),
   ]);
 
-  assert.match(html, /id="cardPrintArea"/);
-  assert.match(source, /id-card-face id-card-front/);
-  assert.match(source, /id-card-face id-card-back/);
-  assert.match(source, /renderIdCardPair/);
-  assert.match(source, /data-card-qr/);
-  assert.match(source, /staff-card-front/);
-  assert.match(source, /student-card-front/);
-  assert.match(source, /BACK · QR ONLY/);
-  assert.match(source, /printCardBatch/);
-  assert.match(source, /preparedCards\.map\(\(card, index\) => renderIdCardPair/);
-  assert.match(html, /Print \/ save ID card/);
+  assert.match(html, /id="qrPrintArea"/);
+  assert.match(html, /Download QR PNG/);
+  assert.match(source, /renderQrBlock/);
+  assert.match(source, /attendance-qr-block/);
+  assert.match(source, /qr-block-code/);
+  assert.match(source, /showQrPreview/);
+  assert.match(source, /printQrBatch/);
+  assert.match(source, /preparedCodes\.map\(\(code, index\) => renderQrBlock/);
+  assert.match(source, /errorCorrectionLevel: "H"/);
+  assert.match(source, /width: 1600/);
+  assert.doesNotMatch(source, /renderIdCardPair|showCardPreview|printCardBatch/);
+  assert.doesNotMatch(html, /Issue a permanent ID card|Show \/ download ID card|Print \/ save ID card|id="cardPrintArea"/);
   assert.match(source, /person\.reference/);
   assert.match(source, /person\.group_name/);
-  assert.match(html, /53\.98 × 85\.60 MM/);
-  assert.match(html, /assets\/wts-school-logo\.jpg/);
-  assert.match(styles, /width:53\.98mm;height:85\.6mm/);
+  assert.match(html, /No ID-card front is generated here/);
+  assert.match(styles, /@page\{size:A4 portrait/);
+  assert.match(styles, /\.qr-block-code/);
+  assert.match(styles, /break-inside:avoid/);
 });
 
-test("ID-card controls reuse permanent QR values and keep replacement explicit", async () => {
+test("QR controls reuse permanent values and restrict replacement to used credentials", async () => {
   const [html, source, rpcSource] = await Promise.all([
     readFile(new URL("../index.html", import.meta.url), "utf8"),
     readFile(new URL("../app.js", import.meta.url), "utf8"),
@@ -163,17 +165,23 @@ test("ID-card controls reuse permanent QR values and keep replacement explicit",
   ]);
 
   assert.match(html, /ONE QR PER PERSON/);
-  assert.match(html, /Show \/ download class cards/);
-  assert.match(html, /Show \/ download all staff cards/);
+  assert.match(html, /Show \/ download class QRs/);
+  assert.match(html, /Show \/ download all staff QRs/);
   assert.match(source, /qrWrite\("issueQr"/);
   assert.match(source, /qrWrite\("replaceQr"/);
   assert.match(source, /data-replace-credential/);
+  assert.match(source, /hasBeenUsed/);
+  assert.match(source, /Replace used QR/);
   assert.doesNotMatch(source, /showSecret\(/);
   assert.match(rpcSource, /attendance_qr_card_api/);
+  assert.match(rpcSource, /"refreshUnusedQr"/);
 });
 
-test("stable QR storage keeps raw values encrypted and replacement explicit", async () => {
-  const migration = await readFile(new URL("../supabase/migrations/20260826120000_stable_qr_id_cards.sql", import.meta.url), "utf8");
+test("stable QR storage keeps raw values encrypted and refreshes only unused legacy values", async () => {
+  const [migration, lifecycle] = await Promise.all([
+    readFile(new URL("../supabase/migrations/20260826120000_stable_qr_id_cards.sql", import.meta.url), "utf8"),
+    readFile(new URL("../supabase/migrations/20260826190000_qr_only_unused_reset.sql", import.meta.url), "utf8"),
+  ]);
 
   assert.match(migration, /add column if not exists qr_secret_id uuid/);
   assert.match(migration, /vault\.create_secret/);
@@ -183,6 +191,15 @@ test("stable QR storage keeps raw values encrypted and replacement explicit", as
   assert.match(migration, /QR_CREDENTIAL_REPLACED/);
   assert.match(migration, /one_active_qr_per_person/);
   assert.doesNotMatch(migration, /raw_secret.*metadata|metadata.*raw_secret/i);
+  assert.match(lifecycle, /p_action not in \('issueQr','replaceQr','refreshUnusedQr'\)/);
+  assert.match(lifecycle, /QR_UNUSED_LEGACY_RESET_COMPLETE/);
+  assert.match(lifecycle, /QR_USED_CARD_REQUIRES_REPLACEMENT/);
+  assert.match(lifecycle, /QR_REPLACEMENT_NOT_ALLOWED_BEFORE_USE/);
+  assert.match(lifecycle, /QR_INITIAL_RESET_NOT_ALLOWED_AFTER_USE/);
+  assert.match(lifecycle, /last_used_at/);
+  assert.match(lifecycle, /attendance_events/);
+  assert.match(lifecycle, /staff_attendance_events/);
+  assert.doesNotMatch(lifecycle, /raw_secret.*metadata|metadata.*raw_secret/i);
 });
 
 test("universal Attendance requests prefer the current RPC before compatibility fallbacks", async () => {
