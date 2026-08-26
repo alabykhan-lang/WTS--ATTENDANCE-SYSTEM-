@@ -51,7 +51,7 @@ export default async function handler(req, res) {
     if (!action || action.length > 120) return sendJson(res, { ok: false, code: "ATTENDANCE_ACTION_REQUIRED" }, 400);
     const rpcName =
       name === "attendance_universal_admin_write_api" &&
-      ["issueQr", "replaceQr"].includes(action)
+      ["issueQr", "replaceQr", "refreshUnusedQr"].includes(action)
         ? "attendance_qr_card_api"
         : RPC_COMPATIBILITY_ALIASES[name] || name;
     result = await supabaseRpc(rpcName, { p_client_code: local.clientCode, p_client_secret: local.clientSecret, p_action: action, p_payload: payload });
