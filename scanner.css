@@ -305,24 +305,6 @@ select:focus {
   color: #fff;
   box-shadow: 0 3px 9px #0b1f3a30;
 }
-.test-switch {
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  margin: 0;
-}
-.test-switch input {
-  width: 21px;
-  height: 21px;
-}
-.test-switch b,
-.test-switch small {
-  display: block;
-}
-.test-switch small {
-  color: var(--muted);
-  font-weight: 500;
-  margin-top: 2px;
-}
 .scan-card {
   margin-bottom: 13px;
 }

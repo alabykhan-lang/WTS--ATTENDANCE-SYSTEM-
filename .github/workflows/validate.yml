@@ -49,7 +49,7 @@ jobs:
           grep -q 'school_identity_portal_login' identity-login.js
           grep -q 'school_identity_change_password' identity-login.js
           grep -q 'attendance-scan' scanner.js
-          grep -q 'diagnosticMode' scanner.html
+          if grep -q 'diagnosticMode' scanner.html; then echo 'Scanner test mode must not be part of the operational UI'; exit 1; fi
           grep -q 'offline_sync' scanner.js
           if grep -q 'public-live.js' index.html; then echo 'Public live loader must not be used'; exit 1; fi
           if grep -RIn -E 'service_role_key|sb_secret_' . --exclude-dir=.git --exclude=validate.yml; then exit 1; fi

@@ -142,6 +142,7 @@
 
   function fillClassSelectors() {
     const options = contextClasses();
+    setOptions("#registerClass", options, "Choose a class");
     setOptions("#reportClass", options, globalScope() ? "All classes" : "Choose class");
     setOptions("#qrBatchClass", options, "Choose a class");
     if (!globalScope() && !$("#reportClass")?.value && options[0]) $("#reportClass").value = options[0].value;
@@ -185,7 +186,8 @@
     if (!state.connected) return;
     if ($(`#view-${viewName}`)?.hidden) return;
     $$(".view").forEach((view) => view.classList.toggle("active", view.id === `view-${viewName}`));
-    $$(".nav").forEach((button) => button.classList.toggle("active", button.dataset.view === viewName));
+    const parentView = ["devices", "imports", "corrections"].includes(viewName) ? "settings" : viewName;
+    $$(".nav").forEach((button) => button.classList.toggle("active", button.dataset.view === parentView));
     setTitle(viewName);
     try {
       if (viewName === "overview") await loadOverview();
@@ -224,12 +226,7 @@
       if (error.code !== "ATTENDANCE_SERVICE_UNAVAILABLE" && error.code !== "ATTENDANCE_RPC_NOT_ALLOWED") throw error;
       summary = await universalRead("summary", { date });
     }
-    const [devices, imports] = await Promise.all([
-      permission("devices.read") || permission("devices.manage") || globalScope() ? universalRead("devices") : Promise.resolve({ devices: [] }),
-      permission("imports.read") || permission("imports.manage") || globalScope() ? universalRead("imports") : Promise.resolve({ batches: [] }),
-    ]);
     state.summary = summary;
-    state.devices = devices.devices || [];
     const student = summary.student || summary;
     const staff = summary.staff || {};
     const slotLabel = state.dashboardSlot === "afternoon" ? "Afternoon closing" : "Morning arrival";
@@ -244,17 +241,6 @@
     $("#today").textContent = `${new Date(`${date}T00:00:00`).toLocaleDateString("en-NG", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} · ${slotLabel}`;
     $("#studentPresenceNote").textContent = state.dashboardSlot === "afternoon" ? "Valid closing scan" : "First valid arrival scan";
     $("#staffPresenceNote").textContent = state.dashboardSlot === "afternoon" ? "Staff closing records" : "Staff arrival records";
-    const events = [...(student.latest_events || []), ...(staff.latest_events || [])].sort((a, b) => String(b.event_time || b.recorded_at).localeCompare(String(a.event_time || a.recorded_at)));
-    renderEvents("#recentEvents", events);
-    const classRows = student.class_summary || student.classes || [];
-    $("#classSummary").innerHTML = classRows.length ? classRows.map((item) => `<div class="class-row"><div><strong>${esc(item.class_key || item.class || "Class")}</strong><small>${numberValue(item.expected)} expected · ${numberValue(item.waiting)} unconfirmed</small></div><div class="class-progress"><span style="width:${Math.min(100, numberValue(item.expected) ? ((numberValue(item.present) + numberValue(item.late)) / numberValue(item.expected)) * 100 : 0)}%"></span></div><b>${numberValue(item.present) + numberValue(item.late)}/${numberValue(item.expected)}</b></div>`).join("") : `<div class="empty">No active class placements are available.</div>`;
-    const attention = [];
-    if (numberValue(student.unconfirmed_classes) > 0 || numberValue(student.waiting) > 0) attention.push(["Class registers need review", `${numberValue(student.unconfirmed_classes || student.waiting)} class/session record(s) are still unresolved.`, "scan"]);
-    if (numberValue(staff.waiting) > 0) attention.push(["Staff records need review", `${staff.waiting} staff record(s) are still unresolved.`, "reports"]);
-    if (!attention.length) attention.push(["No open attention items", "Confirmed data will appear here as the school records attendance.", "reports"]);
-    $("#attentionList").innerHTML = attention.map(([title, copy, viewName]) => `<button class="attention-item" data-go="${viewName}"><span class="attention-icon">!</span><span><b>${esc(title)}</b><small>${esc(copy)}</small></span><span>→</span></button>`).join("");
-    const importCount = (imports.batches || []).length;
-    $("#healthList").innerHTML = `<div class="health-item"><span class="health-check ${state.devices.length ? "good" : "muted"}">${state.devices.length ? "✓" : "–"}</span><div><b>${state.devices.length ? `${state.devices.length} authorized QR device${state.devices.length === 1 ? "" : "s"}` : "QR camera ready"}</b><small>${state.devices.length ? "Status comes from the protected Device Registry." : "Register a school device when a dedicated scanner is ready."}</small></div></div><div class="health-item"><span class="health-check ${importCount ? "good" : "muted"}">${importCount ? "✓" : "–"}</span><div><b>${importCount ? `${importCount} import batch${importCount === 1 ? "" : "es"}` : "No saved scanner imports yet"}</b><small>Saved records are previewed, matched and administrator-confirmed.</small></div></div>`;
   }
 
   const registerStatuses = [
@@ -293,21 +279,17 @@
     ["#markAllPresent", "#saveRegister", "#confirmRegister", "#printRegister"].forEach((selector) => {
       if ($(selector)) $(selector).disabled = !rows.length || locked;
     });
+    if (!$("#registerList")) return;
     $("#registerList").innerHTML = rows.length ? rows.map((row, index) => {
       const current = row.status || "incomplete";
-      const person = { displayName: row.name, photo: row.photo };
-      return `<div class="register-row ${current === "incomplete" ? "needs-entry" : ""}"><span class="pupil-avatar">${avatarMarkup(person, row.name || "P")}</span><span class="person-copy"><strong>${esc(row.name || "Unnamed pupil")}</strong><small>${esc(row.admno || "No admission number")}${row.gender ? ` · ${esc(row.gender)}` : ""}</small></span><label class="register-status-control"><span class="sr-only">Attendance status for ${esc(row.name || "pupil")}</span><select class="status-select" data-register-status="${index}" ${locked ? "disabled" : ""}>${registerStatuses.map(([value, name]) => `<option value="${value}" ${value === current ? "selected" : ""}>${esc(name)}</option>`).join("")}</select></label><input class="register-note-input" data-register-note="${index}" value="${esc(row.note || "")}" placeholder="Note" aria-label="Note for ${esc(row.name || "pupil")}" ${locked ? "disabled" : ""}><span class="row-check" aria-hidden="true">${current === "incomplete" ? "–" : "✓"}</span></div>`;
+      return `<div class="register-row ${current === "incomplete" ? "needs-entry" : ""}"><span class="register-number" aria-hidden="true">${String(index + 1).padStart(2, "0")}</span><span class="person-copy"><strong>${esc(row.name || "Unnamed pupil")}</strong><small>${esc(row.admno || "No admission number")}${row.gender ? ` · ${esc(row.gender)}` : ""}</small></span><label class="register-status-control"><span class="sr-only">Attendance status for ${esc(row.name || "pupil")}</span><select class="status-select" data-register-status="${index}" ${locked ? "disabled" : ""}>${registerStatuses.map(([value, name]) => `<option value="${value}" ${value === current ? "selected" : ""}>${esc(name)}</option>`).join("")}</select></label><input class="register-note-input" data-register-note="${index}" value="${esc(row.note || "")}" placeholder="Note" aria-label="Note for ${esc(row.name || "pupil")}" ${locked ? "disabled" : ""}><span class="row-check" aria-hidden="true">${current === "incomplete" ? "–" : "✓"}</span></div>`;
     }).join("") : `<div class="empty">Open a class register to begin. The active Central Registry roster will appear here.</div>`;
   }
 
   async function loadRegister() {
     const date = $("#registerDate")?.value || todayIso();
     const slot = $("#registerSlot")?.value || "morning";
-    let classKey = $("#registerClass")?.value || "";
-    if (!classKey) {
-      classKey = contextClasses()[0]?.value || "";
-      if ($("#registerClass") && classKey) $("#registerClass").value = classKey;
-    }
+    const classKey = $("#registerClass")?.value || "";
     if (!classKey) {
       state.register = { date, slot, classKey: "", rows: [], lock: {} };
       renderRegister();
@@ -508,26 +490,23 @@
     $("#credentialAvatar").innerHTML = avatarMarkup(state.selectedPerson);
     const data = await universalRead("credentials", { personType: type, personId: id });
     renderCredentialList(data.credentials || []);
-    if (permission("devices.read") || permission("devices.manage") || globalScope()) await loadDevices(true);
-    else setOptions("#credentialDevice", [], "Device assignment restricted");
+    if (permission("devices.read") || permission("devices.manage") || globalScope()) await loadDevices();
   }
 
   function renderCredentialList(credentials) {
-    $("#credentialList").innerHTML = credentials.length ? credentials.map((credential) => {
-      const credentialType = String(credential.credential_type || "").toLowerCase();
-      const isQr = credentialType.includes("qr");
+    const qrCredentials = credentials.filter((credential) => String(credential.credential_type || "").toLowerCase().includes("qr"));
+    $("#credentialList").innerHTML = qrCredentials.length ? qrCredentials.map((credential) => {
       const status = String(credential.status || "").toLowerCase();
       const id = credential.id || credential.credential_id || "";
       const hasBeenUsed = Boolean(credential.last_used_at);
-      const method = isQr ? "Permanent attendance QR" : "Legacy credential";
-      const label = credential.credential_label || (isQr ? "Attendance QR code" : "Previously registered credential");
+      const label = credential.credential_label || "Attendance QR code";
       const detail = label + (credential.token_last4 ? " · ending " + credential.token_last4 : "");
       const actions = [];
-      if (isQr && ["active", "pending"].includes(status)) actions.push('<button class="mini-button" data-show-credential="' + esc(id) + '">Show QR code</button>');
-      if (["active", "pending"].includes(status)) actions.push('<button class="mini-button reject" data-block-credential="' + esc(id) + '">Block ' + (isQr ? "QR" : "credential") + '</button>');
-      if (isQr && hasBeenUsed && !["replaced", "expired"].includes(status)) actions.push('<button class="mini-button approve" data-replace-credential="' + esc(id) + '">Replace used QR</button>');
-      return '<div class="credential-row"><div><b>' + method + '</b><small>' + esc(detail) + '</small></div><div class="credential-actions"><span class="badge ' + statusClass(status) + '">' + esc(cleanStatus(status)) + "</span>" + actions.join("") + "</div></div>";
-    }).join("") : '<div class="empty">No attendance credential has been prepared yet.</div>';
+      if (["active", "pending"].includes(status)) actions.push('<button class="mini-button" data-show-credential="' + esc(id) + '">Show QR code</button>');
+      if (["active", "pending"].includes(status)) actions.push('<button class="mini-button reject" data-block-credential="' + esc(id) + '">Block QR</button>');
+      if (hasBeenUsed && !["replaced", "expired"].includes(status)) actions.push('<button class="mini-button approve" data-replace-credential="' + esc(id) + '">Replace used QR</button>');
+      return '<div class="credential-row"><div><b>Permanent attendance QR</b><small>' + esc(detail) + '</small></div><div class="credential-actions"><span class="badge ' + statusClass(status) + '">' + esc(cleanStatus(status)) + "</span>" + actions.join("") + "</div></div>";
+    }).join("") : '<div class="empty">No attendance QR has been prepared yet.</div>';
   }
 
   async function digest(value) {
@@ -570,8 +549,8 @@
   }
 
   async function blockCredential(credentialId) {
-    if (!window.confirm("Block this card? It will no longer be accepted for attendance.")) return;
-    const reason = window.prompt("Reason for blocking this card:", "Lost or damaged card");
+    if (!window.confirm("Block this QR? It will no longer be accepted for attendance.")) return;
+    const reason = window.prompt("Reason for blocking this QR:", "Lost or damaged QR");
     if (reason === null) return;
     await universalWrite("suspendCredential", {
       credentialId,
@@ -630,12 +609,10 @@
     }
   }
 
-  async function loadDevices(forCredential = false) {
+  async function loadDevices() {
     const data = await universalRead("devices");
     state.devices = data.devices || [];
-    const options = state.devices.map((device) => ({ value: device.id, label: `${device.device_name} · ${device.device_code}` }));
-    if (forCredential) setOptions("#credentialDevice", options, "No reader selected");
-    setOptions("#importDevice", options, "No device selected");
+    setOptions("#importDevice", state.devices.map((device) => ({ value: device.id, label: `${device.device_name} · ${device.device_code}` })), "No device selected");
     $("#deviceEmpty").style.display = state.devices.length ? "none" : "block";
     $("#deviceGrid").innerHTML = state.devices.length ? state.devices.map((device) => {
       const reads = (device.supported_sources || []).includes("qr") ? "QR codes" : "QR source not enabled";
@@ -653,7 +630,6 @@
   function openDeviceSetup() {
     $("#deviceForm").reset();
     $("#newDeviceCode").value = createDeviceCode();
-    $("#newDeviceMethod").value = "qr";
     $("#newDeviceConnection").value = "wifi";
     $("#newDeviceOffline").checked = true;
     $("#deviceDialog").showModal();
@@ -664,7 +640,7 @@
     const result = await universalWrite("registerDevice", {
       deviceCode: $("#newDeviceCode").value,
       deviceName: $("#newDeviceName").value.trim(),
-      modality: $("#newDeviceMethod").value,
+      modality: "qr",
       assignedGate: $("#newDeviceLocation").value.trim(),
       connectionType: $("#newDeviceConnection").value,
       offlineEnabled: $("#newDeviceOffline").checked,
@@ -783,7 +759,7 @@
   async function openMapImportRow() {
     const row = state.import.rows.find((item) => String(item.id) === String(state.import.selectedRowId));
     if (!row || row.validation_status !== "unknown_identity") return toast("Choose a row marked Unknown person first.", "error");
-    $("#mapRowIdentifier").textContent = row.raw_identifier || row.external_user_id || "Unknown card";
+    $("#mapRowIdentifier").textContent = row.raw_identifier || row.external_user_id || "Unknown QR";
     $("#mapPersonType").value = "student";
     $("#mapPersonSearch").value = "";
     $("#mapPersonDialog").showModal();
@@ -799,7 +775,7 @@
     state.import.rows = refreshed.rows || [];
     renderImportPreview();
     $("#mapPersonDialog").close();
-    toast("The unknown card is now matched to that person.", "success");
+    toast("The unknown QR is now matched to that person.", "success");
   }
 
   async function confirmImport() {
@@ -864,7 +840,7 @@
 
   async function renderSettings() {
     const config = state.context?.config || {};
-    $("#contextDetails").innerHTML = `<div><dt>School session</dt><dd>${esc(state.context?.session || config.operational_session || "—")}</dd></div><div><dt>Term</dt><dd>${esc(state.context?.term || config.operational_term || "—")}</dd></div><div><dt>People and classes</dt><dd>Come from the main school records</dd></div><div><dt>Attendance method</dt><dd>QR-first capture with live or offline synchronization</dd></div><div><dt>Not yet scanned</dt><dd>Calculated from the expected class list and recorded QR scans</dd></div><div><dt>Parent messages</dt><dd>${config.parent_notifications_enabled ? "Turned on" : "Not turned on"}</dd></div>`;
+    $("#contextDetails").innerHTML = `<div><dt>School session</dt><dd>${esc(state.context?.session || config.operational_session || "—")}</dd></div><div><dt>Term</dt><dd>${esc(state.context?.term || config.operational_term || "—")}</dd></div><div><dt>People and classes</dt><dd>Come from the main school records</dd></div><div><dt>Attendance method</dt><dd>QR-first capture with live or offline synchronization</dd></div><div><dt>Not yet scanned</dt><dd>Calculated from the expected class list and recorded QR scans</dd></div>`;
     const permissions = state.context?.permissions || [];
     const accessLabels = {
       "*": "All Attendance areas",
@@ -1106,6 +1082,15 @@
 
   function wireEvents() {
     $$(".nav").forEach((button) => button.addEventListener("click", () => openView(button.dataset.view)));
+    $$(".analysis-tab").forEach((button) => button.addEventListener("click", () => {
+      const panelName = button.dataset.analysis;
+      $$(".analysis-tab").forEach((tab) => {
+        const active = tab === button;
+        tab.classList.toggle("active", active);
+        tab.setAttribute("aria-selected", String(active));
+      });
+      $$(".analysis-panel").forEach((panel) => panel.classList.toggle("active", panel.id === `analysis-${panelName}`));
+    }));
     document.addEventListener("click", (event) => {
       const go = event.target.closest("[data-go]");
       if (go) { openView(go.dataset.go); return; }
@@ -1159,7 +1144,6 @@
     $("#issueQr").onclick = () => issueQr().catch((error) => toast(error.message, "error"));
     $("#downloadClassQr").onclick = () => prepareQrBatch("student", $("#qrBatchClass").value).catch((error) => toast(error.message, "error"));
     $("#downloadStaffQr").onclick = () => prepareQrBatch("staff").catch((error) => toast(error.message, "error"));
-    if ($("#credentialAssignForm")) $("#credentialAssignForm").onsubmit = (event) => assignCredential(event).catch((error) => toast(error.message, "error"));
     $("#showQrAgain").onclick = () => issueQr().catch((error) => toast(error.message, "error"));
     $("#addDevice").onclick = openDeviceSetup;
     $("#deviceForm").onsubmit = (event) => addDevice(event).catch((error) => toast(error.message, "error"));

@@ -62,6 +62,9 @@ test("operator workspace exposes the five notebook areas", async () => {
   assert.match(html, /id="confirmRegister"/);
   assert.match(html, /data-dashboard-slot="morning"/);
   assert.match(html, /data-dashboard-slot="afternoon"/);
+  assert.doesNotMatch(html, /id="(?:attentionList|healthList|classSummary|recentEvents)"/);
+  assert.match(html, /id="manualRegisterDetails"/);
+  assert.match(html, /Open a class register to begin/);
 });
 
 test("credential office and scanner are QR-first with no operational NFC controls", async () => {
@@ -72,24 +75,28 @@ test("credential office and scanner are QR-first with no operational NFC control
     readFile(new URL("../app.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(html, /Show \/ download QR/);
+  assert.match(html, /Generate \/ show QR/);
   assert.match(html, /Permanent attendance QR/);
   assert.doesNotMatch(html, /value="(?:nfc_uid|nfc|rfid_uid|fingerprint_device_user_id|temporary_pass)"/i);
-  assert.match(scannerHtml, /value="qr"/);
+  assert.match(scannerHtml, /Automatic QR camera/);
+  assert.doesNotMatch(scannerHtml, /Scanner source|Attach phone location|Remember device secret|Test a QR without recording/i);
   assert.doesNotMatch(scannerHtml, /value="(?:nfc|rfid|usb_ccid|standalone_terminal)"/i);
   assert.doesNotMatch(html, /\bNFC\b/i);
   assert.doesNotMatch(scannerHtml, /\bNFC\b/i);
   assert.doesNotMatch(scannerSource, /\bNFC\b/i);
   assert.doesNotMatch(appSource, /\bNFC\b/i);
+  assert.doesNotMatch(html, /id="newDeviceMethod"|>Source<\/label>/i);
   assert.doesNotMatch(appSource, /createManualEntry/);
+  assert.doesNotMatch(appSource, /contextClasses\(\)\[0\]/);
+  assert.doesNotMatch(scannerSource, /diagnosticMode|rememberSecret|locationPayload/i);
 });
 
 test("record intake explains connected, interrupted, and saved-file paths in plain language", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
-  assert.match(html, /While connected/);
-  assert.match(html, /keeps the event time/);
-  assert.match(html, /CSV, XLSX or delimited text/);
-  assert.match(html, /original scan timestamp/);
+  assert.match(html, /Live scans arrive directly/);
+  assert.match(html, /original scan time/);
+  assert.match(html, /Offline imports/);
+  assert.match(html, /Original scan time/);
 });
 
 test("QR-code search and device setup use the universal permission-scoped flow", async () => {
@@ -159,14 +166,14 @@ test("scanner opens as an always-ready camera with a bundled decoder fallback", 
 
   assert.match(html, /Automatic QR camera/);
   assert.match(html, /id="cameraCanvas"/);
-  assert.match(html, /Keep this page open\. The next card will be read automatically\./);
+  assert.match(html, /Keep this page open\. The next QR code will be read automatically\./);
   assert.match(source, /startActiveReader\(true\)/);
   assert.match(source, /async function detectQrFrame/);
   assert.match(source, /decodeQrRegion/);
   assert.match(source, /detectNativeQrFrame/);
   assert.match(source, /Promise\.race/);
   assert.match(source, /150/);
-  assert.match(html, /scanner\.js\?v=7/);
+  assert.match(html, /scanner\.js\?v=8/);
   assert.match(source, /focusWidth/);
   assert.match(source, /tuneCameraTrack/);
   assert.match(source, /zoom/);
@@ -174,7 +181,7 @@ test("scanner opens as an always-ready camera with a bundled decoder fallback", 
   assert.match(source, /if \(focusedValue\) return focusedValue;/);
   assert.match(source, /1280 \/ Math\.max\(width, height\)/);
   assert.match(source, /WTS_VENDOR\?\.jsQR/);
-  assert.match(source, /Remove this card first/);
+  assert.match(source, /Remove this QR first/);
   assert.match(source, /Allow and start camera/);
   assert.match(source, /navigator\.wakeLock\.request\("screen"\)/);
   assert.match(source, /cameraRestartTimer/);
@@ -210,9 +217,9 @@ test("printable QR output contains a complete labeled code for every person", as
   assert.match(source, /person\.group_name/);
   assert.match(html, /Attendance does not generate an ID-card front/);
   assert.match(html, /Print ID-card back covers/);
-  assert.match(styles, /@page\{size:A4 portrait/);
+  assert.match(styles, /@page\s*\{[^}]*size:\s*A4 landscape/);
   assert.match(styles, /\.qr-block-code/);
-  assert.match(styles, /break-inside:avoid/);
+  assert.match(styles, /break-inside:\s*avoid/);
 });
 
 test("QR controls reuse permanent values and restrict replacement to used credentials", async () => {
@@ -222,9 +229,9 @@ test("QR controls reuse permanent values and restrict replacement to used creden
     readFile(new URL("../api/rpc.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(html, /ONE QR PER PERSON/);
-  assert.match(html, /Show \/ download class QRs/);
-  assert.match(html, /Show \/ download all staff QRs/);
+  assert.match(html, /BATCH OUTPUT/);
+  assert.match(html, /Generate class QRs/);
+  assert.match(html, /Generate staff QRs/);
   assert.match(source, /qrWrite\("issueQr"/);
   assert.match(source, /qrWrite\("replaceQr"/);
   assert.match(source, /data-replace-credential/);

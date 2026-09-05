@@ -11,9 +11,7 @@
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
   const query = new URLSearchParams(window.location.search);
-  const requestedSource = query.get("source");
   const requestedEvent = query.get("event");
-  const initialSource = requestedSource === "qr" ? "qr" : null;
   const initialEvent = ["check_in", "check_out"].includes(requestedEvent) ? requestedEvent : "check_in";
   const sourceLabels = {
     qr: "QR",
@@ -22,7 +20,7 @@
     qr: [
       "Automatic QR camera",
       "Camera permission needed",
-      "Allow the camera once. It will stay ready and read each ID card automatically.",
+      "Allow the camera once. It will stay ready and read each QR code automatically.",
       "Allow and start camera",
     ],
   };
@@ -40,15 +38,13 @@
     INSTALLATION_ID_REQUIRED: "This device requires an installation identity.",
     INSTALLATION_MISMATCH: "This scanner is locked to another installation.",
     SOURCE_NOT_SUPPORTED_BY_DEVICE:
-      "The selected scanner source is not enabled for this device.",
+      "QR capture is not enabled for this device.",
     OFFLINE_SYNC_NOT_ENABLED:
       "Offline synchronisation is not enabled for this device.",
     UNKNOWN_OR_INACTIVE_CREDENTIAL:
-      "This card is unknown, suspended or expired.",
+      "This QR code is unknown, suspended or expired.",
     STUDENT_INACTIVE: "This student is not active.",
     STAFF_INACTIVE: "This staff member is not active.",
-    DIAGNOSTIC_NOT_ALLOWED_ON_PRODUCTION_DEVICE:
-      "Test-only scanning is disabled on this production device.",
     OUTSIDE_CHECK_IN_WINDOW:
       "Check-in is outside the configured attendance time.",
     CHECK_OUT_NOT_OPEN: "Checkout is not open yet.",
@@ -163,38 +159,31 @@
       localStorage.getItem(SECRET_KEY) ||
       "";
     if (config?.deviceCode && config?.installationId && secret) {
-      config.source = "qr";
-      state.config = config;
+      state.config = {
+        deviceCode: config.deviceCode,
+        source: "qr",
+        installationId: config.installationId,
+      };
+      localStorage.setItem(CONFIG_KEY, JSON.stringify(state.config));
       state.secret = secret;
       return true;
     }
     if (config?.deviceCode) {
       $("#deviceCode").value = config.deviceCode;
-      $("#defaultSource").value = "qr";
-      $("#attachLocation").checked = config.attachLocation === true;
     }
     return false;
   }
 
-  function persistConfiguration({
-    deviceCode,
-    secret,
-    source,
-    attachLocation,
-    remember,
-  }) {
+  function persistConfiguration({ deviceCode, secret }) {
     const previous = parse(localStorage.getItem(CONFIG_KEY), {});
     const config = {
       deviceCode,
-      source,
-      attachLocation,
-      remember,
+      source: "qr",
       installationId: previous.installationId || createId(),
     };
     localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
     sessionStorage.setItem(SECRET_KEY, secret);
-    if (remember) localStorage.setItem(SECRET_KEY, secret);
-    else localStorage.removeItem(SECRET_KEY);
+    localStorage.removeItem(SECRET_KEY);
     state.config = config;
     state.secret = secret;
   }
@@ -203,11 +192,8 @@
     $("#setupCard").hidden = true;
     $("#scannerApp").hidden = false;
     $("#connectedDevice").textContent = state.config.deviceCode;
-    $("#settingsLocation").checked = state.config.attachLocation === true;
-    $("#settingsRemember").checked = state.config.remember === true;
     $("#installationPreview").textContent = state.config.installationId;
     $$('[data-event]').forEach((button) => button.classList.toggle("active", button.dataset.event === state.eventType));
-    copySourceOptions();
     setSource(state.config.source || "qr");
     renderQueue();
     updateNetwork();
@@ -215,17 +201,10 @@
     window.setTimeout(() => startActiveReader(true), 120);
   }
 
-  function copySourceOptions() {
-    const target = $("#settingsSource");
-    target.innerHTML = $("#defaultSource").innerHTML;
-    target.value = state.config?.source || "qr";
-  }
-
   function setSource(source) {
     stopCamera(false);
     state.config.source = "qr";
     localStorage.setItem(CONFIG_KEY, JSON.stringify(state.config));
-    $("#settingsSource").value = "qr";
     $("#sourceBadge").textContent =
       sourceLabels[source] || source.toUpperCase();
     const copy = sourceHelp[source] || sourceHelp.qr;
@@ -292,24 +271,6 @@
       .join("");
   }
 
-  async function locationPayload() {
-    if (!state.config.attachLocation || !("geolocation" in navigator))
-      return {};
-    return new Promise((resolve) =>
-      navigator.geolocation.getCurrentPosition(
-        (position) =>
-          resolve({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            locationAccuracyMetres: position.coords.accuracy,
-            locationCapturedAt: new Date(position.timestamp).toISOString(),
-          }),
-        () => resolve({}),
-        { enableHighAccuracy: true, timeout: 6000, maximumAge: 30000 },
-      ),
-    );
-  }
-
   async function requestGateway(body) {
     let response;
     try {
@@ -350,13 +311,6 @@
   }
 
   async function queueCredential(credential, options) {
-    if ($("#diagnosticMode").checked)
-      throw Object.assign(
-        new Error(
-          "Test scans cannot be queued. Connect to the internet and try again.",
-        ),
-        { code: "DIAGNOSTIC_OFFLINE" },
-      );
     const encrypted = await encryptQueuePayload({
       credential,
       note: `Original scanner source: ${options.source}`,
@@ -429,8 +383,6 @@
         eventType: options.eventType,
         source: options.source,
         localRecordedAt: options.localRecordedAt,
-        diagnostic: $("#diagnosticMode").checked,
-        ...(await locationPayload()),
       };
       const data = await requestGateway(body);
       showGatewayResult(data);
@@ -461,20 +413,16 @@
       name = person.name || person.full_name || "Verified person",
       number = person.admno || person.staff_number || "",
       detail = person.class_key || person.designation || person.category || "";
-    const test = data.diagnostic === true || data.recorded === false,
-      status =
-        data.event?.attendance_status ||
-        data.attendance_status ||
-        data.daily_status ||
-        "verified";
-    const title = test ? "Credential verified" : name;
-    const description = test
-      ? `${name}${number ? ` • ${number}` : ""}${detail ? ` • ${detail}` : ""}. Nothing was recorded.`
-      : `${status.replaceAll("_", " ")}${number ? ` • ${number}` : ""}${detail ? ` • ${detail}` : ""}`;
+    const status =
+      data.event?.attendance_status ||
+      data.attendance_status ||
+      data.daily_status ||
+      "verified";
+    const description = `${status.replaceAll("_", " ")}${number ? ` • ${number}` : ""}${detail ? ` • ${detail}` : ""}`;
     showResult(
       "success",
-      test ? "TEST PASSED" : String(data.code || status).replaceAll("_", " "),
-      title,
+      String(data.code || status).replaceAll("_", " "),
+      name,
       description,
     );
   }
@@ -722,7 +670,7 @@
                 $("#cameraStatus").textContent = "Card found · Recording attendance…";
                 try {
                   await submitCredential(value);
-                  $("#cameraStatus").textContent = "Ready for the next card · Remove this card first";
+                  $("#cameraStatus").textContent = "Ready for the next QR code · Remove this QR first";
                 } finally {
                   state.cameraBusy = false;
                 }
@@ -732,7 +680,7 @@
               if (state.cameraClearFrames >= 4) {
                 state.lastCameraValue = "";
                 state.cameraClearFrames = 0;
-                $("#cameraStatus").textContent = "Camera active · Show the QR side of the ID card";
+                $("#cameraStatus").textContent = "Camera active · Show the QR code";
               }
             }
           } catch {}
@@ -792,8 +740,6 @@
           source: "offline_sync",
           localRecordedAt: item.localRecordedAt,
           note: payload.note,
-          diagnostic: false,
-          ...(await locationPayload()),
         });
         queue = queue.filter((candidate) => candidate.id !== item.id);
         saveQueue(queue);
@@ -815,12 +761,8 @@
 
   function saveSettings() {
     state.config.source = "qr";
-    state.config.attachLocation = $("#settingsLocation").checked;
-    state.config.remember = $("#settingsRemember").checked;
     localStorage.setItem(CONFIG_KEY, JSON.stringify(state.config));
     sessionStorage.setItem(SECRET_KEY, state.secret);
-    if (state.config.remember) localStorage.setItem(SECRET_KEY, state.secret);
-    else localStorage.removeItem(SECRET_KEY);
     setSource("qr");
     $("#settingsDialog").close();
     toast("Scanner settings saved.", "success");
@@ -845,20 +787,13 @@
   $("#setupForm").onsubmit = (event) => {
     event.preventDefault();
     const deviceCode = $("#deviceCode").value.trim(),
-      secret = $("#deviceSecret").value,
-      source = $("#defaultSource").value;
+      secret = $("#deviceSecret").value;
     if (!deviceCode || secret.length < 16) {
       $("#setupError").textContent =
         "Enter the complete device code and one-time device secret.";
       return;
     }
-    persistConfiguration({
-      deviceCode,
-      secret,
-      source,
-      attachLocation: $("#attachLocation").checked,
-      remember: $("#rememberSecret").checked,
-    });
+    persistConfiguration({ deviceCode, secret });
     $("#setupError").textContent = "";
     openScanner();
     toast("Scanner connected. It is ready for server-confirmed attendance.", "success");
@@ -916,7 +851,6 @@
       .register("/scanner-sw.js", { scope: "/" })
       .catch(() => {});
   updateNetwork();
-  if (initialSource) $("#defaultSource").value = initialSource;
   if (loadConfiguration()) openScanner();
   else $("#deviceCode").focus();
 })();

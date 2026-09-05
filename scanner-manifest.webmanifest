@@ -1,7 +1,7 @@
 {
   "name": "WTS Attendance Gate Scanner",
   "short_name": "WTS Scanner",
-  "description": "Always-ready school QR and NFC attendance scanner.",
+  "description": "Always-ready school QR attendance scanner.",
   "id": "/scanner",
   "start_url": "/scanner",
   "scope": "/",

@@ -1,5 +1,5 @@
 "use strict";
-const CACHE = "wts-attendance-scanner-v7";
+const CACHE = "wts-attendance-scanner-v8";
 const ASSETS = [
   "/scanner",
   "/scanner.html",

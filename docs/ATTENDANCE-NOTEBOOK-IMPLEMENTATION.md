@@ -38,7 +38,11 @@ Dashboard uses the protected `attendance_notebook_read_api` and accepts a date p
 - students not yet scanned;
 - unconfirmed classes;
 - staff signed in;
-- capture health, attention items, class summaries and recent events.
+- two next actions: open attendance and review the QR capture method.
+
+Device health, saved imports and corrections belong to Setup. Class summaries,
+recent events and printable records belong to Analysis or the focused attendance
+workflow; they are not stacked onto the Dashboard.
 
 The morning and afternoon views are separate. A later afternoon scan cannot overwrite the morning record, and duplicate scans for the same person/session are controlled by the authoritative intake function.
 

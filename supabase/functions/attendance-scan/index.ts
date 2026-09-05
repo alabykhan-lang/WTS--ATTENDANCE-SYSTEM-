@@ -150,9 +150,15 @@ Deno.serve(async (request: Request) => {
   const latitude = numberOrNull(body.latitude);
   const longitude = numberOrNull(body.longitude);
   const accuracy = numberOrNull(body.locationAccuracyMetres);
-  const diagnostic = body.diagnostic === true;
   const note =
     typeof body.note === "string" ? body.note.trim().slice(0, 500) : null;
+
+  if (body.diagnostic === true)
+    return reply(
+      request,
+      { ok: false, code: "SCAN_MODE_UNSUPPORTED" },
+      422,
+    );
 
   if (
     !credential ||
@@ -239,48 +245,32 @@ Deno.serve(async (request: Request) => {
   }
 
   const tokenHash = await sha256(credential);
-  const rpcName = diagnostic
-    ? "diagnose_attendance_credential"
-    : "attendance_universal_intake";
   // Browser scanners cannot provide trustworthy native-device attestation. Devices
   // with integrity_required must use a future attested native scanner instead.
-  const rpcArgs = diagnostic
-    ? {
-        p_token_hash: tokenHash,
-        p_device_id: device.id,
-        p_source: source,
-        p_latitude: latitude,
-        p_longitude: longitude,
-        p_integrity_ok: false,
-      }
-    : {
-        p_token_hash: tokenHash,
-        p_device_id: device.id,
-        p_client_event_id: eventId,
-        p_event_type: eventType,
-        p_source: source,
-        p_event_time: source === "offline_sync" ? localRecordedAt : null,
-        p_local_recorded_at: localRecordedAt,
-        p_source_event_id: eventId,
-        p_note: note,
-        p_metadata: {
-          credential_method: source,
-          source_time_zone: "Africa/Lagos",
-          latitude,
-          longitude,
-          location_accuracy_metres: accuracy,
-        },
-      };
-
-  const { data, error } = await db.rpc(rpcName, rpcArgs);
+  const { data, error } = await db.rpc("attendance_universal_intake", {
+    p_token_hash: tokenHash,
+    p_device_id: device.id,
+    p_client_event_id: eventId,
+    p_event_type: eventType,
+    p_source: source,
+    p_event_time: source === "offline_sync" ? localRecordedAt : null,
+    p_local_recorded_at: localRecordedAt,
+    p_source_event_id: eventId,
+    p_note: note,
+    p_metadata: {
+      credential_method: source,
+      source_time_zone: "Africa/Lagos",
+      latitude,
+      longitude,
+      location_accuracy_metres: accuracy,
+    },
+  });
   if (error)
     return reply(
       request,
       {
         ok: false,
-        code: diagnostic
-          ? "DIAGNOSTIC_PROCESSING_FAILED"
-          : "SCAN_PROCESSING_FAILED",
+        code: "SCAN_PROCESSING_FAILED",
       },
       500,
     );

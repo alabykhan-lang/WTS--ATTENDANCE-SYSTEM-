@@ -10,7 +10,7 @@
 - Verify morning and afternoon selectors load different session records.
 - Verify manual save, confirmation lock and correction request paths with an approved operator.
 - Verify QR/card assignment rejects an active duplicate and displays only a suffix.
-- Verify a diagnostic scan does not write attendance and a normal scan is server-confirmed.
+- Verify a normal QR scan is server-confirmed and a duplicate scan is controlled.
 - Verify an import preview separates ready, duplicate, unknown and invalid rows before confirmation.
 - Verify re-uploading the same checksum is rejected.
 - Verify original event timestamp is retained for imported rows.

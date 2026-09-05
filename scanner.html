@@ -9,7 +9,7 @@
     <meta name="theme-color" content="#0b1f3a" />
     <meta name="mobile-web-app-capable" content="yes" />
     <title>WTS Attendance Scanner</title>
-    <link rel="stylesheet" href="/scanner.css?v=7" />
+    <link rel="stylesheet" href="/scanner.css?v=8" />
     <link rel="manifest" href="/scanner-manifest.webmanifest" />
   </head>
   <body>
@@ -29,7 +29,7 @@
         <h1>Connect this scanner</h1>
         <p>
           Enter the device code and secret once. After setup, this focused QR
-          scanner opens the camera automatically and stays ready for the next ID card.
+          scanner opens the camera automatically and stays ready for the next QR code.
         </p>
         <form id="setupForm">
           <label
@@ -48,21 +48,6 @@
               maxlength="256"
               required
           /></label>
-          <label>Scanner source<select id="defaultSource"><option value="qr">QR camera or QR reader</option></select></label>
-          <label class="check"
-            ><input id="attachLocation" type="checkbox" /><span
-              >Attach phone location when scanning</span
-            ></label
-          >
-          <label class="check"
-            ><input id="rememberSecret" type="checkbox" /><span
-              >Remember the secret on this school-owned phone</span
-            ></label
-          >
-          <p class="security-note">
-            Only remember the secret on a locked phone owned and controlled by
-            the school.
-          </p>
           <button class="primary wide" type="submit">Connect scanner</button>
           <div class="form-error" id="setupError"></div>
         </form>
@@ -91,7 +76,7 @@
               Afternoon closing
             </button>
           </div>
-          <div class="automatic-status"><i></i><span><b>Automatic scanner</b><small>Keep this page open. The next card will be read automatically.</small></span></div>
+          <div class="automatic-status"><i></i><span><b>Automatic scanner</b><small>Keep this page open. The next QR code will be read automatically.</small></span></div>
         </section>
 
         <section class="scan-card">
@@ -107,7 +92,7 @@
             <video id="cameraVideo" playsinline muted></video>
             <canvas id="cameraCanvas" hidden></canvas>
             <div class="camera-target" aria-hidden="true"></div>
-            <div class="camera-live"><i></i><span id="cameraStatus">Camera active · Show the QR side of the ID card</span></div>
+            <div class="camera-live"><i></i><span id="cameraStatus">Camera active · Show the QR code</span></div>
             <button class="camera-close" id="stopCamera" type="button">
               Pause camera
             </button>
@@ -137,7 +122,7 @@
                 maxlength="512"
                 required
               />
-              <button class="secondary" type="submit">Read card</button>
+              <button class="secondary" type="submit">Read QR code</button>
             </form>
           </details>
         </section>
@@ -181,23 +166,6 @@
             ×
           </button>
         </div>
-        <label>Scanner source<select id="settingsSource"><option value="qr">QR camera or QR reader</option></select></label>
-        <label class="check"
-          ><input id="settingsLocation" type="checkbox" /><span
-            >Attach phone location</span
-          ></label
-        >
-        <label class="check"
-          ><input id="settingsRemember" type="checkbox" /><span
-            >Remember device secret</span
-          ></label
-        >
-        <label class="check test-switch"
-          ><input id="diagnosticMode" type="checkbox" /><span
-            ><b>Test a QR without recording attendance</b
-            ><small>Leave this off during normal gate use.</small></span
-          ></label
-        >
         <div class="setting-meta">
           <span>Installation ID</span><code id="installationPreview">—</code>
         </div>
@@ -230,7 +198,7 @@
     </dialog>
 
     <div id="toasts"></div>
-    <script src="/vendor.bundle.js?v=7"></script>
-    <script src="/scanner.js?v=7"></script>
+    <script src="/vendor.bundle.js?v=8"></script>
+    <script src="/scanner.js?v=8"></script>
   </body>
 </html>
