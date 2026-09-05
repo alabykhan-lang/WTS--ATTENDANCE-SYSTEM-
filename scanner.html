@@ -28,8 +28,8 @@
         <small class="eyebrow">SCHOOL-OWNED DEVICE SETUP</small>
         <h1>Connect this scanner</h1>
         <p>
-          Enter the device code and secret once. After setup, this scanner opens
-          the camera automatically and stays ready for the next ID card.
+          Enter the device code and secret once. After setup, this focused QR
+          scanner opens the camera automatically and stays ready for the next ID card.
         </p>
         <form id="setupForm">
           <label
@@ -48,13 +48,7 @@
               maxlength="256"
               required
           /></label>
-          <label
-            >Scanner source
-            <select id="defaultSource">
-              <option value="qr">Phone or computer camera — QR</option>
-              <option value="nfc">Phone NFC or USB NFC reader</option>
-            </select>
-          </label>
+          <label>Scanner source<select id="defaultSource"><option value="qr">QR camera or QR reader</option></select></label>
           <label class="check"
             ><input id="attachLocation" type="checkbox" /><span
               >Attach phone location when scanning</span
@@ -91,10 +85,10 @@
         <section class="mode-card compact-mode">
           <div class="mode-row" role="group" aria-label="Attendance event type">
             <button class="mode active" data-event="check_in" type="button">
-              Check in
+              Morning arrival
             </button>
             <button class="mode" data-event="check_out" type="button">
-              Check out
+              Afternoon closing
             </button>
           </div>
           <div class="automatic-status"><i></i><span><b>Automatic scanner</b><small>Keep this page open. The next card will be read automatically.</small></span></div>
@@ -131,7 +125,7 @@
             Allow and start camera
           </button>
           <details class="reader-fallback">
-            <summary>Use a connected NFC/USB reader or enter a code</summary>
+            <summary>Use a connected QR reader or enter a QR value</summary>
             <form class="reader-row" id="readerForm">
               <input
                 id="credentialInput"
@@ -187,7 +181,7 @@
             ×
           </button>
         </div>
-        <label>Scanner source<select id="settingsSource"></select></label>
+        <label>Scanner source<select id="settingsSource"><option value="qr">QR camera or QR reader</option></select></label>
         <label class="check"
           ><input id="settingsLocation" type="checkbox" /><span
             >Attach phone location</span
@@ -200,7 +194,7 @@
         >
         <label class="check test-switch"
           ><input id="diagnosticMode" type="checkbox" /><span
-            ><b>Test a card without recording attendance</b
+            ><b>Test a QR without recording attendance</b
             ><small>Leave this off during normal gate use.</small></span
           ></label
         >

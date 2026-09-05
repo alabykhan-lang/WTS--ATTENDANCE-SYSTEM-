@@ -2,7 +2,7 @@
 
 ## Supported types
 
-`qr_token`, `nfc_uid`, `mifare_uid`, `rfid_uid`, `generic_card_uid`, `fingerprint_device_user_id`, `face_device_user_id`, `pin`, `external_device_user_id`, `barcode` and `temporary_pass` are supported by the universal credential model.
+`qr_token` is the active operational credential type. The universal data model also retains older external credential types for migration, historical events and future adapter compatibility; they are not exposed in the current QR-first operator screens.
 
 Each active credential maps to exactly one real Central Registry pupil or staff profile. A person may have more than one credential. The same active value cannot be assigned to two people.
 
@@ -19,10 +19,12 @@ Fingerprint and face devices are represented by external user IDs. Attendance do
 ## Assignment flow
 
 1. Search the live pupil or staff list.
-2. Select the credential type.
-3. Tap, scan, paste or enter the reader value.
+2. Issue or retrieve the person’s permanent QR code.
+3. Show, download or print the QR for the ID-card back or a class/staff sheet.
 4. Select the real issuing device when known.
-5. Confirm and activate.
+5. Confirm and activate, or revoke/replace an existing used QR through the controlled workflow.
 6. Audit and retain the credential history.
 
 If a value is already active, assignment fails. Unknown import values remain unresolved until an authorised administrator maps them to an existing identity.
+
+The QR image is not a storage device. It contains a non-meaningful server-mapped token. The authorized scanner records the time and device context; if it is offline, the scanner or import file must retain that original time until synchronization.

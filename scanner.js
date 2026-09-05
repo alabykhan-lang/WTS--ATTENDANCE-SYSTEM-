@@ -10,11 +10,13 @@
   const $$ = (selector) => [...document.querySelectorAll(selector)];
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
-  const requestedSource = new URLSearchParams(window.location.search).get("source");
-  const initialSource = ["qr", "nfc"].includes(requestedSource) ? requestedSource : null;
+  const query = new URLSearchParams(window.location.search);
+  const requestedSource = query.get("source");
+  const requestedEvent = query.get("event");
+  const initialSource = requestedSource === "qr" ? "qr" : null;
+  const initialEvent = ["check_in", "check_out"].includes(requestedEvent) ? requestedEvent : "check_in";
   const sourceLabels = {
     qr: "QR",
-    nfc: "NFC",
   };
   const sourceHelp = {
     qr: [
@@ -22,12 +24,6 @@
       "Camera permission needed",
       "Allow the camera once. It will stay ready and read each ID card automatically.",
       "Allow and start camera",
-    ],
-    nfc: [
-      "Tap an NFC card",
-      "Start NFC reader",
-      "Hold the written NFC card against the back of this phone.",
-      "Start NFC reader",
     ],
   };
   const friendly = {
@@ -62,14 +58,13 @@
   const state = {
     config: null,
     secret: "",
-    eventType: "check_in",
+    eventType: initialEvent,
     cameraStream: null,
     cameraLoop: 0,
     cameraBusy: false,
     cameraPaused: false,
     lastCameraValue: "",
     cameraClearFrames: 0,
-    nfcReader: null,
     wakeLock: null,
     wakeRetryTimer: 0,
     cameraRestartTimer: 0,
@@ -168,14 +163,14 @@
       localStorage.getItem(SECRET_KEY) ||
       "";
     if (config?.deviceCode && config?.installationId && secret) {
-      if (initialSource) config.source = initialSource;
+      config.source = "qr";
       state.config = config;
       state.secret = secret;
       return true;
     }
     if (config?.deviceCode) {
       $("#deviceCode").value = config.deviceCode;
-      $("#defaultSource").value = initialSource || config.source || "qr";
+      $("#defaultSource").value = "qr";
       $("#attachLocation").checked = config.attachLocation === true;
     }
     return false;
@@ -211,6 +206,7 @@
     $("#settingsLocation").checked = state.config.attachLocation === true;
     $("#settingsRemember").checked = state.config.remember === true;
     $("#installationPreview").textContent = state.config.installationId;
+    $$('[data-event]').forEach((button) => button.classList.toggle("active", button.dataset.event === state.eventType));
     copySourceOptions();
     setSource(state.config.source || "qr");
     renderQueue();
@@ -227,9 +223,9 @@
 
   function setSource(source) {
     stopCamera(false);
-    state.config.source = source;
+    state.config.source = "qr";
     localStorage.setItem(CONFIG_KEY, JSON.stringify(state.config));
-    $("#settingsSource").value = source;
+    $("#settingsSource").value = "qr";
     $("#sourceBadge").textContent =
       sourceLabels[source] || source.toUpperCase();
     const copy = sourceHelp[source] || sourceHelp.qr;
@@ -237,13 +233,9 @@
     $("#tapTitle").textContent = copy[1];
     $("#tapHelp").textContent = copy[2];
     $("#startScan").textContent = copy[3] || copy[1];
-    $("#scanIcon").textContent =
-      source === "nfc" ? "◉" : source === "qr" ? "▣" : "▤";
-    $("#credentialInput").placeholder =
-      source === "qr"
-        ? "Enter a QR value only if the camera cannot be used"
-        : `${sourceLabels[source] || "Reader"} input`;
-    $(".reader-fallback").open = source === "nfc";
+    $("#scanIcon").textContent = "▣";
+    $("#credentialInput").placeholder = "Enter a QR value only if the camera cannot be used";
+    $(".reader-fallback").open = false;
   }
 
   async function requestWakeLock() {
@@ -267,12 +259,7 @@
 
   function startActiveReader(automatic = false) {
     if (!state.config) return;
-    if (state.config.source === "qr") return startCamera(automatic);
-    if (state.config.source === "nfc" && !automatic) return startNfc();
-    if (state.config.source === "nfc") {
-      $(".reader-fallback").open = true;
-      $("#credentialInput").focus();
-    }
+    return startCamera(automatic);
   }
 
   function updateNetwork() {
@@ -300,7 +287,7 @@
       .reverse()
       .map(
         (item) =>
-          `<div class="queue-item ${item.status === "failed" ? "failed" : ""}"><div><b>${item.eventType === "check_out" ? "Checkout" : "Check-in"}</b><small> • ${sourceLabels[item.originalSource] || item.originalSource || "Scanner"}</small></div><small>${item.status === "failed" ? item.lastError || "Failed" : new Date(item.localRecordedAt).toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" })}</small></div>`,
+          `<div class="queue-item ${item.status === "failed" ? "failed" : ""}"><div><b>${item.eventType === "check_out" ? "Afternoon closing" : "Morning arrival"}</b><small> • QR scanner</small></div><small>${item.status === "failed" ? item.lastError || "Failed" : new Date(item.localRecordedAt).toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" })}</small></div>`,
       )
       .join("");
   }
@@ -788,67 +775,6 @@
     }
   }
 
-  async function startNfc() {
-    if (!("NDEFReader" in window))
-      return showResult(
-        "error",
-        "NFC_NOT_SUPPORTED",
-        "NFC scanning is unavailable",
-        "Use an NFC-enabled Android phone with Chrome, or use the credential input.",
-      );
-    try {
-      state.nfcReader = new NDEFReader();
-      await state.nfcReader.scan();
-      showResult(
-        "warning",
-        "NFC READY",
-        "Waiting for an NFC card",
-        "Hold the card against the back of this phone.",
-      );
-      state.nfcReader.onreading = async (event) => {
-        let value = "";
-        for (const record of event.message.records) {
-          if (
-            record.recordType === "text" ||
-            record.recordType === "url" ||
-            record.mediaType === "text/plain"
-          ) {
-            try {
-              value = decoder
-                .decode(record.data)
-                .replace(/^\u0002en/i, "")
-                .trim();
-            } catch {}
-            if (value) break;
-          }
-        }
-        value = value || event.serialNumber || "";
-        if (value) await submitCredential(value);
-        else
-          showResult(
-            "error",
-            "EMPTY_NFC_CARD",
-            "No credential found",
-            "Write the attendance credential to this NFC card first.",
-          );
-      };
-      state.nfcReader.onreadingerror = () =>
-        showResult(
-          "error",
-          "NFC_READ_FAILED",
-          "Card could not be read",
-          "Hold the card steady and try again.",
-        );
-    } catch (error) {
-      showResult(
-        "error",
-        "NFC_PERMISSION",
-        "NFC reader could not start",
-        error?.message || "Allow NFC access and try again.",
-      );
-    }
-  }
-
   async function syncQueue() {
     if (state.syncing || !navigator.onLine || !state.config || !state.secret)
       return;
@@ -888,14 +814,14 @@
   }
 
   function saveSettings() {
-    state.config.source = $("#settingsSource").value;
+    state.config.source = "qr";
     state.config.attachLocation = $("#settingsLocation").checked;
     state.config.remember = $("#settingsRemember").checked;
     localStorage.setItem(CONFIG_KEY, JSON.stringify(state.config));
     sessionStorage.setItem(SECRET_KEY, state.secret);
     if (state.config.remember) localStorage.setItem(SECRET_KEY, state.secret);
     else localStorage.removeItem(SECRET_KEY);
-    setSource(state.config.source);
+    setSource("qr");
     $("#settingsDialog").close();
     toast("Scanner settings saved.", "success");
     window.setTimeout(() => startActiveReader(true), 100);

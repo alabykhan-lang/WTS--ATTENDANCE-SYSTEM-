@@ -14,7 +14,7 @@ function percentage(actual, possible) {
 }
 
 test("card identifiers normalise punctuation without changing QR token case", () => {
-  assert.equal(normalizeIdentifier("  a1-b2:c3  ", "nfc_uid"), "A1-B2C3");
+  assert.equal(normalizeIdentifier("  a1-b2:c3  ", "generic_card_uid"), "A1-B2C3");
   assert.equal(normalizeIdentifier("  secure.Token/Case  ", "qr_token"), "secure.Token/Case");
 });
 
@@ -48,38 +48,48 @@ test("portal SSO launch keeps the Attendance app locked until callback exchange"
   assert.doesNotMatch(portalLaunch, /return true/);
 });
 
-test("operator workspace exposes five focused areas and no manual marking screen", async () => {
+test("operator workspace exposes the five notebook areas", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   const primary = [...html.matchAll(/<button class="nav(?: active)?" data-view="([^"]+)">/g)].map((match) => match[1]);
 
-  assert.deepEqual(primary, ["overview", "scan", "credentials", "imports", "reports"]);
-  assert.doesNotMatch(html, /Manual Marking|id="view-manual"|id="manualStaffForm"/);
-  assert.match(html, /Two simple ways to take attendance\./);
+  assert.deepEqual(primary, ["overview", "scan", "reports", "settings", "credentials"]);
+  assert.match(html, />Dashboard<\/button>/);
+  assert.match(html, />Take Attendance<\/button>/);
+  assert.match(html, />Analysis<\/button>/);
+  assert.match(html, />Setup<\/button>/);
+  assert.match(html, />QR Codes Generation<\/button>/);
+  assert.match(html, /id="registerDate"/);
+  assert.match(html, /id="confirmRegister"/);
+  assert.match(html, /data-dashboard-slot="morning"/);
+  assert.match(html, /data-dashboard-slot="afternoon"/);
 });
 
-test("credential office and scanner are restricted to QR and NFC", async () => {
-  const [html, scannerHtml, appSource] = await Promise.all([
+test("credential office and scanner are QR-first with no operational NFC controls", async () => {
+  const [html, scannerHtml, scannerSource, appSource] = await Promise.all([
     readFile(new URL("../index.html", import.meta.url), "utf8"),
     readFile(new URL("../scanner.html", import.meta.url), "utf8"),
+    readFile(new URL("../scanner.js", import.meta.url), "utf8"),
     readFile(new URL("../app.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(html, /Show \/ download QR code/);
+  assert.match(html, /Show \/ download QR/);
   assert.match(html, /Permanent attendance QR/);
-  assert.match(html, /value="nfc_uid"/);
-  assert.doesNotMatch(html, /rfid_uid|fingerprint_device_user_id|temporary_pass/);
+  assert.doesNotMatch(html, /value="(?:nfc_uid|nfc|rfid_uid|fingerprint_device_user_id|temporary_pass)"/i);
   assert.match(scannerHtml, /value="qr"/);
-  assert.match(scannerHtml, /value="nfc"/);
-  assert.doesNotMatch(scannerHtml, /value="rfid"|value="usb_ccid"|value="standalone_terminal"/);
+  assert.doesNotMatch(scannerHtml, /value="(?:nfc|rfid|usb_ccid|standalone_terminal)"/i);
+  assert.doesNotMatch(html, /\bNFC\b/i);
+  assert.doesNotMatch(scannerHtml, /\bNFC\b/i);
+  assert.doesNotMatch(scannerSource, /\bNFC\b/i);
+  assert.doesNotMatch(appSource, /\bNFC\b/i);
   assert.doesNotMatch(appSource, /createManualEntry/);
 });
 
 test("record intake explains connected, interrupted, and saved-file paths in plain language", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   assert.match(html, /While connected/);
-  assert.match(html, /keeps the scans safely/);
-  assert.match(html, /USB, Bluetooth, or Wi-Fi/);
-  assert.match(html, /\.csv,\.xlsx,\.xls,\.txt,\.tsv/);
+  assert.match(html, /keeps the event time/);
+  assert.match(html, /CSV, XLSX or delimited text/);
+  assert.match(html, /original scan timestamp/);
 });
 
 test("QR-code search and device setup use the universal permission-scoped flow", async () => {
@@ -88,11 +98,55 @@ test("QR-code search and device setup use the universal permission-scoped flow",
     readFile(new URL("../app.js", import.meta.url), "utf8"),
   ]);
   assert.match(appSource, /universalRead\("people"/);
-  assert.doesNotMatch(appSource, /studentRead\("students"|staffRead\("staff"/);
+  assert.doesNotMatch(appSource, /studentRead\("students"/);
+  assert.match(appSource, /staffRead\("staff"\)/);
   assert.match(appSource, /universalWrite\("registerDevice"/);
+  assert.match(appSource, /const notebookRead = .*attendance_notebook_read_api/);
+  assert.match(appSource, /const staffRead = .*staff_attendance_admin_read_api/);
+  assert.match(await readFile(new URL("../api/rpc.js", import.meta.url), "utf8"), /"attendance_notebook_read_api"/);
   assert.match(html, /id="deviceDialog"/);
   assert.match(html, /id="readyDeviceCode"/);
   assert.match(html, /id="readyDeviceSecret"/);
+});
+
+test("notebook dashboard contract is AM/PM-specific and read-only", async () => {
+  const migration = await readFile(new URL("../supabase/migrations/20260905160000_attendance_notebook_dashboard_snapshot.sql", import.meta.url), "utf8");
+  assert.match(migration, /attendance_notebook_read_api/);
+  assert.match(migration, /session_slot/);
+  assert.match(migration, /morning|afternoon/);
+  assert.match(migration, /NOTEBOOK_DASHBOARD_READY/);
+  assert.doesNotMatch(migration, /insert into|update public\.attendance_(?:student|staff)|delete from/i);
+});
+
+test("staff analysis and printed register hooks are present", async () => {
+  const [html, source] = await Promise.all([
+    readFile(new URL("../index.html", import.meta.url), "utf8"),
+    readFile(new URL("../app.js", import.meta.url), "utf8"),
+  ]);
+  assert.match(html, /id="staffAnalysisPerson"/);
+  assert.match(html, /id="staffHistoryRows"/);
+  assert.match(html, /id="staffLogbookRows"/);
+  assert.match(source, /staffRead\("history"/);
+  assert.match(source, /universalRead\("staff_logbook"/);
+  assert.match(source, /printStaffLogbook/);
+  assert.match(source, /printRegisterSheet/);
+  assert.match(html, /id="staffManualForm"/);
+  assert.match(html, /id="staffManualPerson"/);
+  assert.match(source, /notebookWrite\("manualStaffAttendance"/);
+  assert.match(await readFile(new URL("../api/rpc.js", import.meta.url), "utf8"), /"attendance_notebook_write_api"/);
+});
+
+test("manual staff fallback is protected, timestamped, and additive", async () => {
+  const migration = await readFile(new URL("../supabase/migrations/20260905163000_attendance_notebook_staff_manual.sql", import.meta.url), "utf8");
+  assert.match(migration, /attendance_notebook_write_api/);
+  assert.match(migration, /manualStaffAttendance/);
+  assert.match(migration, /Africa\/Lagos/);
+  assert.match(migration, /attendance_raw_events/);
+  assert.match(migration, /attendance_staff_session_records/);
+  assert.match(migration, /attendance_admin_audit/);
+  assert.match(migration, /attendance_emit_outbox_event/);
+  assert.match(migration, /ADMIN_PERMISSION_DENIED/);
+  assert.doesNotMatch(migration, /delete from/i);
 });
 
 test("scanner opens as an always-ready camera with a bundled decoder fallback", async () => {
@@ -140,10 +194,13 @@ test("printable QR output contains a complete labeled code for every person", as
   assert.match(html, /id="qrPrintArea"/);
   assert.match(html, /Download QR PNG/);
   assert.match(source, /renderQrBlock/);
+  assert.match(source, /renderQrBackCover/);
   assert.match(source, /attendance-qr-block/);
+  assert.match(source, /qr-back-cover/);
   assert.match(source, /qr-block-code/);
   assert.match(source, /showQrPreview/);
   assert.match(source, /printQrBatch/);
+  assert.match(source, /printQrBackCovers/);
   assert.match(source, /preparedCodes\.map\(\(code, index\) => renderQrBlock/);
   assert.match(source, /errorCorrectionLevel: "H"/);
   assert.match(source, /width: 1600/);
@@ -151,7 +208,8 @@ test("printable QR output contains a complete labeled code for every person", as
   assert.doesNotMatch(html, /Issue a permanent ID card|Show \/ download ID card|Print \/ save ID card|id="cardPrintArea"/);
   assert.match(source, /person\.reference/);
   assert.match(source, /person\.group_name/);
-  assert.match(html, /No ID-card front is generated here/);
+  assert.match(html, /Attendance does not generate an ID-card front/);
+  assert.match(html, /Print ID-card back covers/);
   assert.match(styles, /@page\{size:A4 portrait/);
   assert.match(styles, /\.qr-block-code/);
   assert.match(styles, /break-inside:avoid/);

@@ -18,6 +18,11 @@
     lastQrCodes: [],
     qrBatchBusy: false,
     rosterSync: null,
+    dashboardSlot: "morning",
+    register: { date: "", slot: "morning", classKey: "", rows: [], lock: {} },
+    staffPeople: [],
+    staffLogbook: [],
+    staffHistory: [],
   };
 
   const esc = (value) => String(value ?? "").replace(/[&<>'"]/g, (char) => ({
@@ -39,7 +44,10 @@
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? text(value) : date.toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" });
   };
-  const todayIso = () => new Date().toISOString().slice(0, 10);
+  const todayIso = () => {
+    const parts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Lagos", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date()).filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+    return `${parts.year}-${parts.month}-${parts.day}`;
+  };
   const monthStart = () => `${todayIso().slice(0, 7)}-01`;
   const permission = (name) => {
     const permissions = state.context?.permissions || [];
@@ -71,7 +79,7 @@
         ADMIN_REQUIRED: "Your school account is not allowed to use this part of Attendance.",
         DEVICE_NAME_REQUIRED: "Give the device a clear name, such as Main Gate Phone.",
         DEVICE_CODE_EXISTS: "That device code is already in use. Create a new code and try again.",
-        INVALID_DEVICE_METHOD: "Choose whether the device reads QR codes, NFC cards, or both.",
+        INVALID_DEVICE_METHOD: "Choose QR codes as the device source.",
         CREDENTIAL_ALREADY_ASSIGNED: "This credential is already linked to somebody else.",
         QR_USED_CARD_REQUIRES_REPLACEMENT: "This QR has already recorded attendance. Replace it only if the printed QR was lost or damaged.",
         QR_REPLACEMENT_NOT_ALLOWED_BEFORE_USE: "This QR has not been used yet. Generate or download it again; replacement is only for a used QR that was lost or damaged.",
@@ -80,6 +88,9 @@
         QR_CREDENTIAL_NOT_REPLACEABLE: "That QR has already been replaced or expired.",
         QR_REPLACEMENT_FAILED: "The replacement did not complete, so the old QR was left unchanged.",
         PERSON_TYPE_REQUIRED: "Choose Students or Staff before searching.",
+        REGISTER_LOCKED: "This attendance record is locked. Use the controlled correction workflow.",
+        STAFF_INACTIVE: "That staff identity is no longer active in Central Registry.",
+        STAFF_EVENT_TIME_REQUIRED: "Enter the actual arrival or closing time for this staff record.",
       };
       const error = new Error(data?.message || friendlyErrors[data?.code] || "Attendance could not complete that request.");
       error.code = data?.code;
@@ -89,9 +100,12 @@
   }
 
   const universalRead = (action, payload = {}) => rpc("attendance_universal_admin_read_api", action, payload);
+  const notebookRead = (action, payload = {}) => rpc("attendance_notebook_read_api", action, payload);
   const universalWrite = (action, payload = {}) => rpc("attendance_universal_admin_write_api", action, payload);
+  const notebookWrite = (action, payload = {}) => rpc("attendance_notebook_write_api", action, payload);
   const qrWrite = (action, payload = {}) => rpc("attendance_qr_card_api", action, payload);
   const controlsWrite = (action, payload = {}) => rpc("attendance_controls_admin_write_api", action, payload);
+  const staffRead = (action, payload = {}) => rpc("staff_attendance_admin_read_api", action, payload);
 
   function connected(value, message = "") {
     state.connected = value;
@@ -146,18 +160,21 @@
       const viewName = button.dataset.view;
       button.hidden = gated[viewName] === false;
     });
+    if ($("#staffManualPanel")) {
+      $("#staffManualPanel").hidden = !(permission("manual_entries.create") || permission("staff.manage") || permission("*"));
+    }
   }
 
   function setTitle(viewName) {
     const titles = {
-      overview: ["Home", "Today's attendance in one place."],
-      scan: ["Take Attendance", "Scan a QR code or tap an NFC card."],
-      credentials: ["QR Codes", "Generate and print attendance QR codes for students and staff."],
-      devices: ["Set Up Devices", "Add a school phone, scanner, or card reader."],
-      imports: ["Bring In Records", "Receive scans now or upload records saved by a device."],
-      corrections: ["Fix a Record", "Review a record that needs correction."],
-      reports: ["View Reports", "See attendance for a day, week, month, term, or session."],
-      settings: ["School Setup", "See the school period and the Attendance areas you can use."],
+      overview: ["Dashboard", "Today's attendance in one place."],
+      scan: ["Take Attendance", "Keep the QR scanner ready or open a class register."],
+      credentials: ["QR Codes Generation", "Generate and print attendance QR codes for students and staff."],
+      devices: ["Authorized QR Devices", "Register the devices allowed to send attendance."],
+      imports: ["Import Centre", "Reconcile QR scanner records saved for later."],
+      corrections: ["Corrections", "Review a controlled attendance change."],
+      reports: ["Analysis", "See student and staff attendance by day, week, month, term, or session."],
+      settings: ["Setup", "Manage QR capture, devices, imports and the official school context."],
     };
     const [title, subtitle] = titles[viewName] || titles.overview;
     $("#title").textContent = title;
@@ -172,11 +189,12 @@
     setTitle(viewName);
     try {
       if (viewName === "overview") await loadOverview();
+      if (viewName === "scan") { await loadRegister(); await loadStaffManualPeople(); }
       if (viewName === "credentials") await loadCredentialPeople();
       if (viewName === "devices") await loadDevices();
       if (viewName === "imports") await loadImports();
       if (viewName === "corrections") await loadCorrections();
-      if (viewName === "reports") await runReport();
+      if (viewName === "reports") { await runReport(); await loadStaffAnalysis(); }
       if (viewName === "settings") await renderSettings();
     } catch (error) {
       toast(error.message, "error");
@@ -195,8 +213,18 @@
   }
 
   async function loadOverview() {
-    const [summary, devices, imports] = await Promise.all([
-      universalRead("summary"),
+    const date = todayIso();
+    let summary;
+    try {
+      summary = await notebookRead("dashboard", { date, sessionSlot: state.dashboardSlot });
+    } catch (error) {
+      // Keep the dashboard usable while an older Supabase schema cache rolls
+      // forward. The established whole-day snapshot is a safe read-only
+      // fallback; the notebook contract is used as soon as it is available.
+      if (error.code !== "ATTENDANCE_SERVICE_UNAVAILABLE" && error.code !== "ATTENDANCE_RPC_NOT_ALLOWED") throw error;
+      summary = await universalRead("summary", { date });
+    }
+    const [devices, imports] = await Promise.all([
       permission("devices.read") || permission("devices.manage") || globalScope() ? universalRead("devices") : Promise.resolve({ devices: [] }),
       permission("imports.read") || permission("imports.manage") || globalScope() ? universalRead("imports") : Promise.resolve({ batches: [] }),
     ]);
@@ -204,24 +232,244 @@
     state.devices = devices.devices || [];
     const student = summary.student || summary;
     const staff = summary.staff || {};
+    const slotLabel = state.dashboardSlot === "afternoon" ? "Afternoon closing" : "Morning arrival";
+    $$("[data-dashboard-slot]").forEach((button) => button.classList.toggle("active", button.dataset.dashboardSlot === state.dashboardSlot));
+    $("#todayHeading").textContent = `${slotLabel} attendance`;
     $("#sExpected").textContent = numberValue(student.expected);
     $("#sPresent").textContent = numberValue(student.present);
     $("#sLate").textContent = numberValue(student.late);
     $("#sAbsent").textContent = numberValue(student.absent);
-    $("#sUnconfirmed").textContent = numberValue(student.waiting ?? student.unconfirmed_classes ?? (student.class_summary || []).filter((item) => numberValue(item.waiting) > 0).length);
+    $("#sUnconfirmed").textContent = numberValue(student.unconfirmed_classes ?? (student.class_summary || []).filter((item) => numberValue(item.waiting) > 0 || !["confirmed", "closed"].includes(item.register_status)).length);
     $("#tPresent").textContent = numberValue(staff.present);
-    $("#today").textContent = new Date().toLocaleDateString("en-NG", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    $("#today").textContent = `${new Date(`${date}T00:00:00`).toLocaleDateString("en-NG", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} · ${slotLabel}`;
+    $("#studentPresenceNote").textContent = state.dashboardSlot === "afternoon" ? "Valid closing scan" : "First valid arrival scan";
+    $("#staffPresenceNote").textContent = state.dashboardSlot === "afternoon" ? "Staff closing records" : "Staff arrival records";
     const events = [...(student.latest_events || []), ...(staff.latest_events || [])].sort((a, b) => String(b.event_time || b.recorded_at).localeCompare(String(a.event_time || a.recorded_at)));
     renderEvents("#recentEvents", events);
     const classRows = student.class_summary || student.classes || [];
     $("#classSummary").innerHTML = classRows.length ? classRows.map((item) => `<div class="class-row"><div><strong>${esc(item.class_key || item.class || "Class")}</strong><small>${numberValue(item.expected)} expected · ${numberValue(item.waiting)} unconfirmed</small></div><div class="class-progress"><span style="width:${Math.min(100, numberValue(item.expected) ? ((numberValue(item.present) + numberValue(item.late)) / numberValue(item.expected)) * 100 : 0)}%"></span></div><b>${numberValue(item.present) + numberValue(item.late)}/${numberValue(item.expected)}</b></div>`).join("") : `<div class="empty">No active class placements are available.</div>`;
     const attention = [];
-    if (numberValue(student.waiting) > 0) attention.push(["Student sessions need review", `${student.waiting} expected records are still unresolved.`, "corrections"]);
-    if (numberValue(staff.waiting) > 0) attention.push(["Staff events need review", `${staff.waiting} staff records are still unresolved.`, "corrections"]);
+    if (numberValue(student.unconfirmed_classes) > 0 || numberValue(student.waiting) > 0) attention.push(["Class registers need review", `${numberValue(student.unconfirmed_classes || student.waiting)} class/session record(s) are still unresolved.`, "scan"]);
+    if (numberValue(staff.waiting) > 0) attention.push(["Staff records need review", `${staff.waiting} staff record(s) are still unresolved.`, "reports"]);
     if (!attention.length) attention.push(["No open attention items", "Confirmed data will appear here as the school records attendance.", "reports"]);
     $("#attentionList").innerHTML = attention.map(([title, copy, viewName]) => `<button class="attention-item" data-go="${viewName}"><span class="attention-icon">!</span><span><b>${esc(title)}</b><small>${esc(copy)}</small></span><span>→</span></button>`).join("");
     const importCount = (imports.batches || []).length;
-    $("#healthList").innerHTML = `<div class="health-item"><span class="health-check ${state.devices.length ? "good" : "muted"}">${state.devices.length ? "✓" : "–"}</span><div><b>${state.devices.length ? `${state.devices.length} registered device${state.devices.length === 1 ? "" : "s"}` : "Web scanner ready"}</b><small>${state.devices.length ? "Health status comes from the live Device Registry." : "Use a phone camera or compatible NFC reader."}</small></div></div><div class="health-item"><span class="health-check ${importCount ? "good" : "muted"}">${importCount ? "✓" : "–"}</span><div><b>${importCount ? `${importCount} import batch${importCount === 1 ? "" : "es"}` : "No device imports yet"}</b><small>Imported records are previewed and checksum-protected.</small></div></div>`;
+    $("#healthList").innerHTML = `<div class="health-item"><span class="health-check ${state.devices.length ? "good" : "muted"}">${state.devices.length ? "✓" : "–"}</span><div><b>${state.devices.length ? `${state.devices.length} authorized QR device${state.devices.length === 1 ? "" : "s"}` : "QR camera ready"}</b><small>${state.devices.length ? "Status comes from the protected Device Registry." : "Register a school device when a dedicated scanner is ready."}</small></div></div><div class="health-item"><span class="health-check ${importCount ? "good" : "muted"}">${importCount ? "✓" : "–"}</span><div><b>${importCount ? `${importCount} import batch${importCount === 1 ? "" : "es"}` : "No saved scanner imports yet"}</b><small>Saved records are previewed, matched and administrator-confirmed.</small></div></div>`;
+  }
+
+  const registerStatuses = [
+    ["present", "Present"],
+    ["late", "Late"],
+    ["absent", "Absent"],
+    ["excused", "Excused"],
+    ["official_activity", "Official activity"],
+    ["sick_leave", "Sick leave"],
+    ["not_expected", "Not expected"],
+    ["incomplete", "Incomplete"],
+  ];
+
+  function registerStatusLabel(value) {
+    return registerStatuses.find(([status]) => status === value)?.[1] || cleanStatus(value || "Incomplete");
+  }
+
+  function registerLocked() {
+    return ["confirmed", "closed", "archived"].includes(String(state.register.lock?.status || "").toLowerCase());
+  }
+
+  function renderRegister() {
+    const rows = state.register.rows || [];
+    const locked = registerLocked();
+    const lockStatus = String(state.register.lock?.status || "open").toLowerCase();
+    const incomplete = rows.filter((row) => !row.status || row.status === "incomplete").length;
+    const label = state.register.slot === "afternoon" ? "Afternoon closing" : "Morning arrival";
+    const lockLabel = ["confirmed", "closed", "archived"].includes(lockStatus) ? cleanStatus(lockStatus) : incomplete ? `${incomplete} incomplete` : "Open";
+    const stateNode = $("#registerState");
+    if (stateNode) {
+      stateNode.textContent = lockLabel;
+      stateNode.className = `pill ${statusClass(lockStatus === "open" && incomplete ? "pending" : lockStatus)}`;
+    }
+    if ($("#registerHeading")) $("#registerHeading").textContent = `${state.register.classKey || "Class"} · ${label}`;
+    if ($("#registerSubheading")) $("#registerSubheading").textContent = `${displayDate(state.register.date)} · ${rows.length} pupil record(s) · ${state.context?.session || "Current session"} · ${state.context?.term || "Current term"}`;
+    ["#markAllPresent", "#saveRegister", "#confirmRegister", "#printRegister"].forEach((selector) => {
+      if ($(selector)) $(selector).disabled = !rows.length || locked;
+    });
+    $("#registerList").innerHTML = rows.length ? rows.map((row, index) => {
+      const current = row.status || "incomplete";
+      const person = { displayName: row.name, photo: row.photo };
+      return `<div class="register-row ${current === "incomplete" ? "needs-entry" : ""}"><span class="pupil-avatar">${avatarMarkup(person, row.name || "P")}</span><span class="person-copy"><strong>${esc(row.name || "Unnamed pupil")}</strong><small>${esc(row.admno || "No admission number")}${row.gender ? ` · ${esc(row.gender)}` : ""}</small></span><label class="register-status-control"><span class="sr-only">Attendance status for ${esc(row.name || "pupil")}</span><select class="status-select" data-register-status="${index}" ${locked ? "disabled" : ""}>${registerStatuses.map(([value, name]) => `<option value="${value}" ${value === current ? "selected" : ""}>${esc(name)}</option>`).join("")}</select></label><input class="register-note-input" data-register-note="${index}" value="${esc(row.note || "")}" placeholder="Note" aria-label="Note for ${esc(row.name || "pupil")}" ${locked ? "disabled" : ""}><span class="row-check" aria-hidden="true">${current === "incomplete" ? "–" : "✓"}</span></div>`;
+    }).join("") : `<div class="empty">Open a class register to begin. The active Central Registry roster will appear here.</div>`;
+  }
+
+  async function loadRegister() {
+    const date = $("#registerDate")?.value || todayIso();
+    const slot = $("#registerSlot")?.value || "morning";
+    let classKey = $("#registerClass")?.value || "";
+    if (!classKey) {
+      classKey = contextClasses()[0]?.value || "";
+      if ($("#registerClass") && classKey) $("#registerClass").value = classKey;
+    }
+    if (!classKey) {
+      state.register = { date, slot, classKey: "", rows: [], lock: {} };
+      renderRegister();
+      return;
+    }
+    const data = await universalRead("register", { date, sessionSlot: slot, classKey });
+    state.register = { date, slot, classKey, rows: data.students || [], lock: data.lock || {} };
+    renderRegister();
+  }
+
+  function registerRowsFromDom() {
+    return (state.register.rows || []).map((row, index) => ({
+      studentId: row.id,
+      status: $("[data-register-status=\"" + index + "\"]")?.value || row.status || "incomplete",
+      note: $("[data-register-note=\"" + index + "\"]")?.value.trim() || null,
+    }));
+  }
+
+  async function saveManualRegister({ silent = false } = {}) {
+    if (!state.register.classKey || !state.register.rows.length) return toast("Open a class register first.", "warning");
+    if (registerLocked()) return toast("This register is locked. Use the controlled correction workflow.", "warning");
+    const rows = registerRowsFromDom();
+    await universalWrite("saveRegister", { date: state.register.date, sessionSlot: state.register.slot, classKey: state.register.classKey, rows });
+    if (!silent) toast("Register saved. Confirm it after every row is complete.", "success");
+    await loadRegister();
+    await loadOverview();
+  }
+
+  async function confirmManualRegister() {
+    if (!state.register.classKey || !state.register.rows.length) return toast("Open a class register first.", "warning");
+    if (registerLocked()) return toast("This register is already locked.", "warning");
+    const rows = registerRowsFromDom();
+    if (rows.some((row) => row.status === "incomplete")) return toast("Complete every pupil row before confirming the register.", "error");
+    await universalWrite("saveRegister", { date: state.register.date, sessionSlot: state.register.slot, classKey: state.register.classKey, rows });
+    await universalWrite("confirmRegister", { date: state.register.date, sessionSlot: state.register.slot, classKey: state.register.classKey });
+    toast("Register confirmed and locked.", "success");
+    await loadRegister();
+    await loadOverview();
+  }
+
+  function markAllRegisterPresent() {
+    if (registerLocked()) return toast("This register is locked.", "warning");
+    $$('[data-register-status]').forEach((select) => { select.value = "present"; });
+    toast("All rows are marked present. Save or confirm to record the change.", "success");
+  }
+
+  const canRecordStaffManually = () => permission("manual_entries.create") || permission("staff.manage") || permission("*");
+
+  function localClock() {
+    return new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Africa/Lagos",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).format(new Date());
+  }
+
+  async function loadStaffManualPeople() {
+    if (!canRecordStaffManually()) return;
+    let data;
+    try {
+      data = await staffRead("staff");
+    } catch (error) {
+      if (error.code !== "ADMIN_PERMISSION_DENIED") throw error;
+      const fallback = await universalRead("people", { personType: "staff" });
+      data = { staff: fallback.people || [] };
+    }
+    state.staffPeople = data.staff || [];
+    setOptions("#staffManualPerson", state.staffPeople.map((person) => ({
+      value: person.id,
+      label: `${person.full_name || person.display_name || "Staff"}${person.staff_number ? ` · ${person.staff_number}` : ""}`,
+    })), "Choose a staff member");
+  }
+
+  async function saveManualStaff(event) {
+    event?.preventDefault();
+    if (!canRecordStaffManually()) return toast("Manual staff attendance is restricted to authorized Attendance officers.", "error");
+    const staffId = $("#staffManualPerson")?.value;
+    const attendanceDate = $("#staffManualDate")?.value || todayIso();
+    const sessionSlot = $("#staffManualSlot")?.value || "morning";
+    const eventType = $("#staffManualEventType")?.value || "check_in";
+    const eventClock = $("#staffManualTime")?.value || "";
+    const status = $("#staffManualStatus")?.value || "auto";
+    const note = $("#staffManualNote")?.value.trim() || null;
+    const noTimeStatuses = new Set(["absent", "leave", "official_assignment", "sick_leave", "half_day", "excused", "not_expected", "school_closed"]);
+    if (!staffId) return toast("Choose a real staff member first.", "warning");
+    if (!eventClock && (status === "auto" || !noTimeStatuses.has(status))) return toast("Enter the actual arrival or closing time.", "warning");
+    const result = await notebookWrite("manualStaffAttendance", {
+      staffId,
+      attendanceDate,
+      sessionSlot,
+      eventType,
+      eventClock: eventClock || null,
+      status,
+      note,
+    });
+    const personName = result.staff?.name || "Staff record";
+    toast(`${personName} recorded: ${cleanStatus(result.attendance?.status || status)}.`, "success");
+    $("#staffManualNote").value = "";
+    $("#staffManualStatus").value = "auto";
+    $("#staffManualTime").value = localClock();
+    await Promise.all([loadStaffLogbook(), loadOverview()]);
+  }
+
+  async function loadStaffLogbook() {
+    const date = $("#staffLogbookDate")?.value || todayIso();
+    try {
+      const data = await universalRead("staff_logbook", { date });
+      state.staffLogbook = data.staff || [];
+    } catch (error) {
+      state.staffLogbook = [];
+      if ($("#staffLogbookRows")) $("#staffLogbookRows").innerHTML = `<tr><td colspan="9" class="empty">Staff logbook is not available for this account.</td></tr>`;
+      throw error;
+    }
+    const rows = [...state.staffLogbook].sort((a, b) => String(a.arrival || "9999").localeCompare(String(b.arrival || "9999")) || String(a.full_name || "").localeCompare(String(b.full_name || "")));
+    $("#staffLogbookRows").innerHTML = rows.length ? rows.map((row, index) => {
+      const hasDeparture = Boolean(row.departure);
+      const status = row.status || "incomplete";
+      return `<tr><td>${index + 1}</td><td><strong>${esc(row.full_name || "Unnamed staff")}</strong>${row.department ? `<small>${esc(row.department)}</small>` : ""}</td><td>${esc(row.staff_number || "—")}</td><td>${esc(row.designation || "—")}</td><td>${esc(displayTime(row.arrival))}</td><td><span class="badge ${statusClass(status)}">${esc(cleanStatus(status))}</span></td><td>${esc(displayTime(row.departure))}</td><td><span class="badge ${hasDeparture ? "recorded" : "incomplete"}">${hasDeparture ? "Recorded" : "Not yet recorded"}</span></td><td>${esc(row.method || "QR / manual")}</td></tr>`;
+    }).join("") : `<tr><td colspan="9" class="empty">No staff attendance has been recorded for this date.</td></tr>`;
+    return rows;
+  }
+
+  async function loadStaffAnalysis() {
+    const date = $("#staffLogbookDate")?.value || todayIso();
+    if ($("#staffLogbookDate") && !$("#staffLogbookDate").value) $("#staffLogbookDate").value = date;
+    if ($("#staffHistoryFrom") && !$("#staffHistoryFrom").value) $("#staffHistoryFrom").value = monthStart();
+    if ($("#staffHistoryTo") && !$("#staffHistoryTo").value) $("#staffHistoryTo").value = date;
+    try {
+      const [snapshot, people] = await Promise.all([staffRead("snapshot", { date, session: state.context?.session }), staffRead("staff")]);
+      const summary = snapshot.staff || snapshot || {};
+      $("#staffExpected").textContent = numberValue(summary.expected);
+      $("#staffPresent").textContent = numberValue(summary.present);
+      $("#staffLate").textContent = numberValue(summary.late);
+      $("#staffWaiting").textContent = numberValue(summary.waiting);
+      state.staffPeople = people.staff || [];
+      setOptions("#staffAnalysisPerson", state.staffPeople.map((person) => ({ value: person.id, label: `${person.full_name || person.display_name || "Staff"}${person.staff_number ? ` · ${person.staff_number}` : ""}` })), "Choose a staff member for history");
+      $("#staffHistoryRows").innerHTML = `<div class="empty">Choose a staff member to view daily history.</div>`;
+    } catch (error) {
+      $("#staffExpected").textContent = "—";
+      $("#staffPresent").textContent = "—";
+      $("#staffLate").textContent = "—";
+      $("#staffWaiting").textContent = "—";
+      $("#staffHistoryRows").innerHTML = `<div class="empty">Staff analysis requires the staff attendance read permission.</div>`;
+      if (error.code !== "ADMIN_PERMISSION_DENIED") throw error;
+    }
+    try {
+      await loadStaffLogbook();
+    } catch (error) {
+      if (error.code !== "ADMIN_PERMISSION_DENIED") throw error;
+    }
+  }
+
+  async function loadStaffHistory() {
+    const staffId = $("#staffAnalysisPerson")?.value;
+    if (!staffId) return toast("Choose a staff member first.", "warning");
+    const from = $("#staffHistoryFrom")?.value || monthStart();
+    const to = $("#staffHistoryTo")?.value || todayIso();
+    const data = await staffRead("history", { staffId, from, to });
+    state.staffHistory = data.history || [];
+    const person = state.staffPeople.find((item) => String(item.id) === String(staffId));
+    $("#staffHistoryRows").innerHTML = state.staffHistory.length ? state.staffHistory.map((row) => `<div class="report-row"><div><b>${esc(displayDate(row.attendance_date))}</b><small>${esc(person?.full_name || "Selected staff")}${row.note ? ` · ${esc(row.note)}` : ""}</small></div><div><strong class="history-status">${esc(cleanStatus(row.daily_status || "incomplete"))}</strong><small>${esc(displayTime(row.first_check_in))} arrival · ${esc(displayTime(row.last_check_out))} closing${numberValue(row.late_minutes) ? ` · ${numberValue(row.late_minutes)} min late` : ""}</small></div></div>`).join("") : `<div class="empty">No daily staff records for the selected period.</div>`;
   }
 
   function normalizeCredentialPerson(person, type) {
@@ -271,12 +519,12 @@
       const status = String(credential.status || "").toLowerCase();
       const id = credential.id || credential.credential_id || "";
       const hasBeenUsed = Boolean(credential.last_used_at);
-      const method = isQr ? "Permanent attendance QR" : credentialType.includes("nfc") ? "NFC tap card" : "Attendance credential";
-      const label = credential.credential_label || (isQr ? "Attendance QR code" : "NFC attendance card");
+      const method = isQr ? "Permanent attendance QR" : "Legacy credential";
+      const label = credential.credential_label || (isQr ? "Attendance QR code" : "Previously registered credential");
       const detail = label + (credential.token_last4 ? " · ending " + credential.token_last4 : "");
       const actions = [];
       if (isQr && ["active", "pending"].includes(status)) actions.push('<button class="mini-button" data-show-credential="' + esc(id) + '">Show QR code</button>');
-      if (["active", "pending"].includes(status)) actions.push('<button class="mini-button reject" data-block-credential="' + esc(id) + '">Block ' + (isQr ? "QR" : "card") + '</button>');
+      if (["active", "pending"].includes(status)) actions.push('<button class="mini-button reject" data-block-credential="' + esc(id) + '">Block ' + (isQr ? "QR" : "credential") + '</button>');
       if (isQr && hasBeenUsed && !["replaced", "expired"].includes(status)) actions.push('<button class="mini-button approve" data-replace-credential="' + esc(id) + '">Replace used QR</button>');
       return '<div class="credential-row"><div><b>' + method + '</b><small>' + esc(detail) + '</small></div><div class="credential-actions"><span class="badge ' + statusClass(status) + '">' + esc(cleanStatus(status)) + "</span>" + actions.join("") + "</div></div>";
     }).join("") : '<div class="empty">No attendance credential has been prepared yet.</div>';
@@ -390,8 +638,8 @@
     setOptions("#importDevice", options, "No device selected");
     $("#deviceEmpty").style.display = state.devices.length ? "none" : "block";
     $("#deviceGrid").innerHTML = state.devices.length ? state.devices.map((device) => {
-      const reads = (device.supported_sources || []).map((source) => source === "qr" ? "QR codes" : source === "nfc" ? "NFC cards" : source).join(" and ");
-      const connects = ({ wifi: "Wi-Fi", cellular: "mobile data", usb: "USB or Bluetooth", mixed: "more than one way", ethernet: "network cable", offline: "file transfer only" })[device.connection_type] || cleanStatus(device.connection_type);
+      const reads = (device.supported_sources || []).includes("qr") ? "QR codes" : "QR source not enabled";
+      const connects = ({ wifi: "Wi-Fi", cellular: "mobile data", usb: "wireless reader link", mixed: "more than one way", ethernet: "network cable", offline: "file transfer only" })[device.connection_type] || cleanStatus(device.connection_type);
       const status = device.computed_status || device.status || "unknown";
       return `<article class="device-card"><div class="device-top"><div><small class="eyebrow">DEVICE CODE · ${esc(device.device_code)}</small><h3>${esc(device.device_name)}</h3></div><span class="badge ${statusClass(status)}">${esc(cleanStatus(status))}</span></div><div class="device-details"><div><span>Reads</span><b>${esc(reads || "Not chosen")}</b></div><div><span>Used at</span><b>${esc(device.assigned_gate || device.location || "Not set")}</b></div><div><span>Connects by</span><b>${esc(connects || "Not set")}</b></div><div><span>If internet stops</span><b>${device.offline_enabled ? "Saves scans safely" : "Needs a connection"}</b></div><div><span>Last contact</span><b>${esc(displayTime(device.last_sync_at || device.last_seen_at))}</b></div><div><span>Device status</span><b>${esc(cleanStatus(device.health_status || "not checked yet"))}</b></div></div></article>`;
     }).join("") : "";
@@ -405,7 +653,7 @@
   function openDeviceSetup() {
     $("#deviceForm").reset();
     $("#newDeviceCode").value = createDeviceCode();
-    $("#newDeviceMethod").value = "both";
+    $("#newDeviceMethod").value = "qr";
     $("#newDeviceConnection").value = "wifi";
     $("#newDeviceOffline").checked = true;
     $("#deviceDialog").showModal();
@@ -420,7 +668,7 @@
       assignedGate: $("#newDeviceLocation").value.trim(),
       connectionType: $("#newDeviceConnection").value,
       offlineEnabled: $("#newDeviceOffline").checked,
-      deploymentMode: $("#newDeviceMethod").value === "qr" ? "mobile_admin" : "gate_fixed",
+      deploymentMode: "gate_fixed",
     });
     $("#deviceDialog").close();
     $("#readyDeviceCode").textContent = result.device.device_code;
@@ -616,7 +864,7 @@
 
   async function renderSettings() {
     const config = state.context?.config || {};
-    $("#contextDetails").innerHTML = `<div><dt>School session</dt><dd>${esc(state.context?.session || config.operational_session || "—")}</dd></div><div><dt>Term</dt><dd>${esc(state.context?.term || config.operational_term || "—")}</dd></div><div><dt>People and classes</dt><dd>Come from the main school records</dd></div><div><dt>Ways to record attendance</dt><dd>Scan a QR code or tap an NFC card</dd></div><div><dt>Not present</dt><dd>Calculated from the expected class list and recorded scans</dd></div><div><dt>Parent messages</dt><dd>${config.parent_notifications_enabled ? "Turned on" : "Not turned on"}</dd></div>`;
+    $("#contextDetails").innerHTML = `<div><dt>School session</dt><dd>${esc(state.context?.session || config.operational_session || "—")}</dd></div><div><dt>Term</dt><dd>${esc(state.context?.term || config.operational_term || "—")}</dd></div><div><dt>People and classes</dt><dd>Come from the main school records</dd></div><div><dt>Attendance method</dt><dd>QR-first capture with live or offline synchronization</dd></div><div><dt>Not yet scanned</dt><dd>Calculated from the expected class list and recorded QR scans</dd></div><div><dt>Parent messages</dt><dd>${config.parent_notifications_enabled ? "Turned on" : "Not turned on"}</dd></div>`;
     const permissions = state.context?.permissions || [];
     const accessLabels = {
       "*": "All Attendance areas",
@@ -678,6 +926,26 @@
     '</article>';
   }
 
+  function renderQrBackCover(code, index) {
+    const person = code.person || {};
+    const isStudent = person.personType === "student";
+    const kind = isStudent ? "STUDENT" : "STAFF";
+    const reference = text(person.reference, "No school number");
+    const groupOrRole = isStudent
+      ? text(person.class_name || person.class || person.level || person.group_name, "No class")
+      : text(person.designation || person.role || person.staff_role || person.position || person.staff_category, "Staff");
+    const qrImage = code.qrDataUrl
+      ? '<img class="qr-back-image" data-qr-back-index="' + index + '" src="' + esc(code.qrDataUrl) + '" alt="Attendance QR code for ' + esc(text(person.displayName, "person")) + '">'
+      : '<span class="qr-back-placeholder">QR</span>';
+    return '<article class="qr-back-cover ' + (isStudent ? "student-qr-back-cover" : "staff-qr-back-cover") + '">' +
+      '<header class="qr-back-brand"><span class="qr-back-crest"><img src="/assets/wts-school-logo.jpg" alt=""></span><span><b>WAY TO SUCCESS STANDARD SCHOOLS</b><small>EJIGBO · ATTENDANCE</small></span></header>' +
+      '<div class="qr-back-copy"><small>ATTENDANCE IDENTIFIER</small><h2>SCAN TO RECORD ATTENDANCE</h2></div>' +
+      '<div class="qr-back-frame"><span>SCAN THIS CODE</span>' + qrImage + '</div>' +
+      '<div class="qr-back-person"><strong>' + esc(text(person.displayName, "WTS person")) + '</strong><span>' + esc(kind + ' · ' + reference + ' · ' + groupOrRole) + '</span></div>' +
+      '<p class="qr-back-hint">Keep this QR cover on the back of the school ID card. Report a lost or damaged QR to the school office.</p>' +
+      '</article>';
+  }
+
   async function showQrPreview(title, codes) {
     const safeCodes = (codes || []).filter((code) => code && code.person && code.raw);
     if (!safeCodes.length) throw new Error("No printable QR code was returned.");
@@ -703,6 +971,7 @@
       : preparedCodes.length + " complete attendance QR codes are ready. Every selected person is included in this print document.";
     $("#downloadQrPng").hidden = preparedCodes.length !== 1;
     $("#printQrDialog").hidden = false;
+    $("#printQrBackCovers").hidden = false;
     $("#printQrDialog").textContent = preparedCodes.length === 1 ? "Print / save QR PDF" : "Print / save all QR codes";
 
     state.lastQrCodes = preparedCodes;
@@ -769,6 +1038,64 @@
     window.setTimeout(() => printWindow.print(), 120);
   }
 
+  async function printQrBackCovers() {
+    const codes = (state.lastQrCodes || []).filter((code) => code?.person && code?.qrDataUrl);
+    if (!codes.length) return toast("Prepare the attendance QR codes first.", "warning");
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return toast("Allow the print preview window to open, then try again.", "warning");
+    const stylesheet = esc(window.location.origin + "/styles.css");
+    const markup = codes.map((code, index) => renderQrBackCover(code, index)).join("");
+    printWindow.document.open();
+    printWindow.document.write('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>WTS QR ID-card back covers</title><link rel="stylesheet" href="' + stylesheet + '"></head><body class="print-qr-back"><main class="qr-back-print-sheet">' + markup + '</main></body></html>');
+    printWindow.document.close();
+    const styleLinks = [...printWindow.document.querySelectorAll('link[rel="stylesheet"]')];
+    const styleReady = styleLinks.map((link) => new Promise((resolve) => {
+      if (link.sheet) return resolve();
+      link.addEventListener("load", resolve, { once: true });
+      link.addEventListener("error", resolve, { once: true });
+    }));
+    const imageReady = [...printWindow.document.images].map((image) => {
+      if (image.complete) return Promise.resolve();
+      return new Promise((resolve) => {
+        image.addEventListener("load", resolve, { once: true });
+        image.addEventListener("error", resolve, { once: true });
+      });
+    });
+    await Promise.all([...styleReady, ...imageReady]);
+    printWindow.addEventListener("afterprint", () => window.setTimeout(() => printWindow.close(), 250), { once: true });
+    printWindow.focus();
+    window.setTimeout(() => printWindow.print(), 120);
+  }
+
+  function openPrintWindow(title, markup) {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return toast("Allow pop-ups to print this register.", "warning");
+    const stylesheet = esc(window.location.origin + "/styles.css");
+    printWindow.document.open();
+    printWindow.document.write(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><link rel="stylesheet" href="${stylesheet}"></head><body class="print-document"><main>${markup}</main></body></html>`);
+    printWindow.document.close();
+    printWindow.addEventListener("afterprint", () => window.setTimeout(() => printWindow.close(), 250), { once: true });
+    printWindow.focus();
+    window.setTimeout(() => printWindow.print(), 180);
+  }
+
+  function printRegisterSheet() {
+    if (!state.register.classKey || !state.register.rows.length) return toast("Open a class register before printing.", "warning");
+    const rows = registerRowsFromDom();
+    const label = state.register.slot === "afternoon" ? "Afternoon closing" : "Morning arrival";
+    const markup = `<header class="print-heading"><small>WAY TO SUCCESS STANDARD SCHOOLS, EJIGBO</small><h1>Student attendance register</h1><p>${esc(state.register.classKey)} · ${esc(label)} · ${esc(displayDate(state.register.date))}</p><p>${esc(state.context?.session || "Current session")} · ${esc(state.context?.term || "Current term")}</p></header><table class="print-table"><thead><tr><th>S/N</th><th>Pupil name</th><th>Admission number</th><th>Status</th><th>Note</th></tr></thead><tbody>${state.register.rows.map((row, index) => `<tr><td>${index + 1}</td><td>${esc(row.name || "Unnamed pupil")}</td><td>${esc(row.admno || "—")}</td><td>${esc(registerStatusLabel(rows[index]?.status || row.status || "incomplete"))}</td><td>${esc(rows[index]?.note || row.note || "")}</td></tr>`).join("")}</tbody></table><footer class="print-signatures"><span>Class teacher: __________________________</span><span>Signature: __________________________</span><span>Administrator / principal: __________________________</span></footer>`;
+    openPrintWindow("WTS student attendance register", markup);
+  }
+
+  async function printStaffLogbook() {
+    if (!state.staffLogbook.length) {
+      try { await loadStaffLogbook(); } catch { return; }
+    }
+    const date = $("#staffLogbookDate")?.value || todayIso();
+    const markup = `<header class="print-heading"><small>WAY TO SUCCESS STANDARD SCHOOLS, EJIGBO</small><h1>Daily staff attendance register</h1><p>${esc(displayDate(date))} · ${esc(state.context?.session || "Current session")} · ${esc(state.context?.term || "Current term")}</p></header><table class="print-table"><thead><tr><th>S/N</th><th>Staff name</th><th>Staff number</th><th>Position</th><th>Morning arrival</th><th>Arrival status</th><th>Afternoon closing</th><th>Closing status</th><th>Method</th></tr></thead><tbody>${state.staffLogbook.map((row, index) => `<tr><td>${index + 1}</td><td>${esc(row.full_name || "Unnamed staff")}</td><td>${esc(row.staff_number || "—")}</td><td>${esc(row.designation || "—")}</td><td>${esc(displayTime(row.arrival))}</td><td>${esc(cleanStatus(row.status || "incomplete"))}</td><td>${esc(displayTime(row.departure))}</td><td>${row.departure ? "Recorded" : "Not yet recorded"}</td><td>${esc(row.method || "QR / manual")}</td></tr>`).join("")}</tbody></table><footer class="print-signatures"><span>Staff signatures: __________________________</span><span>Class teacher / supervisor: __________________________</span><span>Administrator / principal: __________________________</span></footer>`;
+    openPrintWindow("WTS daily staff attendance register", markup);
+  }
+
   function printArea(className) {
     document.body.classList.add(className);
     window.setTimeout(() => {
@@ -782,6 +1109,8 @@
     document.addEventListener("click", (event) => {
       const go = event.target.closest("[data-go]");
       if (go) { openView(go.dataset.go); return; }
+      const slotButton = event.target.closest("[data-dashboard-slot]");
+      if (slotButton) { state.dashboardSlot = slotButton.dataset.dashboardSlot === "afternoon" ? "afternoon" : "morning"; loadOverview().catch((error) => toast(error.message, "error")); return; }
       const showCredential = event.target.closest("[data-show-credential]");
       if (showCredential) { issueQr().catch((error) => toast(error.message, "error")); return; }
       const replaceCredential = event.target.closest("[data-replace-credential]");
@@ -798,16 +1127,39 @@
       const importRow = event.target.closest("[data-import-row]");
       if (importRow) { state.import.selectedRowId = importRow.dataset.importRow; renderImportPreview(); }
     });
+    document.addEventListener("change", (event) => {
+      const status = event.target.closest("[data-register-status]");
+      if (status) {
+        const row = state.register.rows[Number(status.dataset.registerStatus)];
+        if (row) row.status = status.value;
+        const check = status.closest(".register-row")?.querySelector(".row-check");
+        if (check) check.textContent = status.value === "incomplete" ? "–" : "✓";
+      }
+    });
     $("#refresh").onclick = () => loadContext().catch((error) => toast(error.message, "error"));
     $("#login").onclick = signOut;
-    $("#refreshScanEvents").onclick = () => loadOverview().then(() => renderEvents("#scanEvents", [...(state.summary?.latest_events || []), ...(state.summary?.staff?.latest_events || [])])).catch((error) => toast(error.message, "error"));
+    $("#refreshScanEvents").onclick = () => loadOverview().then(() => renderEvents("#scanEvents", [...(state.summary?.student?.latest_events || state.summary?.latest_events || []), ...(state.summary?.staff?.latest_events || [])])).catch((error) => toast(error.message, "error"));
+    $("#registerDate").value = todayIso();
+    $("#registerDate").onchange = () => loadRegister().catch((error) => toast(error.message, "error"));
+    $("#registerSlot").onchange = () => loadRegister().catch((error) => toast(error.message, "error"));
+    $("#registerClass").onchange = () => loadRegister().catch((error) => toast(error.message, "error"));
+    $("#loadRegister").onclick = () => loadRegister().catch((error) => toast(error.message, "error"));
+    $("#markAllPresent").onclick = markAllRegisterPresent;
+    $("#saveRegister").onclick = () => saveManualRegister().catch((error) => toast(error.message, "error"));
+    $("#confirmRegister").onclick = () => confirmManualRegister().catch((error) => toast(error.message, "error"));
+    $("#printRegister").onclick = printRegisterSheet;
+    $("#staffManualForm").onsubmit = (event) => saveManualStaff(event).catch((error) => toast(error.message, "error"));
+    $("#staffManualEventType").onchange = () => {
+      const checkOut = $("#staffManualEventType").value === "check_out";
+      $("#staffManualSlot").value = checkOut ? "afternoon" : "morning";
+    };
     $("#credentialPersonType").onchange = () => { state.selectedPerson = null; $("#credentialDetail").hidden = true; $("#credentialEmpty").hidden = false; loadCredentialPeople().catch((error) => toast(error.message, "error")); };
     $("#searchCredentials").onclick = () => loadCredentialPeople().catch((error) => toast(error.message, "error"));
     $("#credentialSearch").onkeydown = (event) => { if (event.key === "Enter") loadCredentialPeople().catch((error) => toast(error.message, "error")); };
     $("#issueQr").onclick = () => issueQr().catch((error) => toast(error.message, "error"));
     $("#downloadClassQr").onclick = () => prepareQrBatch("student", $("#qrBatchClass").value).catch((error) => toast(error.message, "error"));
     $("#downloadStaffQr").onclick = () => prepareQrBatch("staff").catch((error) => toast(error.message, "error"));
-    $("#credentialAssignForm").onsubmit = (event) => assignCredential(event).catch((error) => toast(error.message, "error"));
+    if ($("#credentialAssignForm")) $("#credentialAssignForm").onsubmit = (event) => assignCredential(event).catch((error) => toast(error.message, "error"));
     $("#showQrAgain").onclick = () => issueQr().catch((error) => toast(error.message, "error"));
     $("#addDevice").onclick = openDeviceSetup;
     $("#deviceForm").onsubmit = (event) => addDevice(event).catch((error) => toast(error.message, "error"));
@@ -825,14 +1177,24 @@
     $("#refreshImports").onclick = () => loadImports().catch((error) => toast(error.message, "error"));
     $("#refreshCorrections").onclick = () => loadCorrections().catch((error) => toast(error.message, "error"));
     $("#runReport").onclick = () => runReport().catch((error) => toast(error.message, "error"));
+    $("#loadStaffAnalysis").onclick = () => loadStaffAnalysis().catch((error) => toast(error.message, "error"));
+    $("#loadStaffHistory").onclick = () => loadStaffHistory().catch((error) => toast(error.message, "error"));
+    $("#refreshStaffLogbook").onclick = () => loadStaffAnalysis().catch((error) => toast(error.message, "error"));
     $("#retryRosterSync").onclick = () => retryRosterSync().catch((error) => toast(error.message, "error"));
     $("#printReport").onclick = () => printArea("print-report");
+    $("#printStaffLogbook").onclick = () => printStaffLogbook().catch((error) => toast(error.message, "error"));
     $("#closeQr").onclick = () => $("#qrDialog").close();
     $("#closeQrButton").onclick = () => $("#qrDialog").close();
     $("#downloadQrPng").onclick = downloadQrPng;
     $("#printQrDialog").onclick = () => printQrBatch().catch((error) => toast(error.message, "error"));
+    $("#printQrBackCovers").onclick = () => printQrBackCovers().catch((error) => toast(error.message, "error"));
     $("#reportFrom").value = monthStart();
     $("#reportTo").value = todayIso();
+    $("#staffManualDate").value = todayIso();
+    $("#staffManualTime").value = localClock();
+    $("#staffLogbookDate").value = todayIso();
+    $("#staffHistoryFrom").value = monthStart();
+    $("#staffHistoryTo").value = todayIso();
   }
 
   async function loadContext() {

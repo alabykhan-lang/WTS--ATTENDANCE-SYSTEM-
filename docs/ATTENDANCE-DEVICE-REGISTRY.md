@@ -1,8 +1,10 @@
 # Attendance Device Registry
 
-The Device Registry contains only real school-owned or authorised devices. It supports a card reader, fingerprint or multi-biometric terminal, QR/mobile scanner, USB import source, Wi-Fi/LAN terminal and manual register source.
+The Device Registry contains only real school-owned or authorised devices. The current operational device is a QR camera/reader or standalone QR terminal. The registry also supports a saved-file import source and the controlled manual register source. A future device may use Wi-Fi, mobile data, Ethernet or another documented transport, but it must still authenticate to the Attendance intake boundary.
 
 Each device record includes its code, name, category, manufacturer/model/serial metadata where supplied, firmware, physical location, connection/import method, supported sources, time-zone and health/synchronisation fields, clock-drift allowance metadata, ownership/deployment mode, status and audit history.
+
+At setup, record the gate/station, connection mode, time zone and whether offline retention is enabled. A device that is merely wireless is not automatically internet-connected: live delivery requires a network-capable terminal and a documented custom HTTPS/API contract. A scanner with internal storage can still be used through the authorized import workflow, provided its export preserves the original scan time and source record.
 
 Operational statuses are `pending_setup`, `active`, `offline`, `suspended`, `retired` and `faulty`. Existing registered device rows are preserved. The UI shows an honest empty state when there are no purchased devices.
 

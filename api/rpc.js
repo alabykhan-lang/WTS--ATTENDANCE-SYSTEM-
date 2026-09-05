@@ -13,6 +13,8 @@ import {
 
 const OPERATOR_RPCS = new Set([
   "attendance_universal_admin_read_api",
+  "attendance_notebook_read_api",
+  "attendance_notebook_write_api",
   "attendance_universal_admin_write_api",
   "attendance_qr_card_api",
   "attendance_admin_read_api",
