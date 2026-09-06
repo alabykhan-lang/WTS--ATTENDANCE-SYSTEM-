@@ -1,204 +1,33 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta
-      name="viewport"
-      content="width=device-width,initial-scale=1,viewport-fit=cover"
-    />
-    <meta name="theme-color" content="#0b1f3a" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <title>WTS Attendance Scanner</title>
-    <link rel="stylesheet" href="/scanner.css?v=8" />
-    <link rel="manifest" href="/scanner-manifest.webmanifest" />
-  </head>
-  <body>
-    <header class="scanner-header">
-      <a class="scanner-brand" href="/" aria-label="WTS Attendance management">
-        <b><img src="/assets/wts-school-logo.jpg" alt=""></b>
-        <span>Gate Scanner<small>Way to Success Standard Schools</small></span>
-      </a>
-      <div class="network-pill" id="networkPill">
-        <i></i><span>Checking</span>
-      </div>
-    </header>
-
-    <main>
-      <section class="setup-card" id="setupCard">
-        <small class="eyebrow">SCHOOL-OWNED DEVICE SETUP</small>
-        <h1>Connect this scanner</h1>
-        <p>
-          Enter the device code and secret once. After setup, this focused QR
-          scanner opens the camera automatically and stays ready for the next QR code.
-        </p>
-        <form id="setupForm">
-          <label
-            >Device code<input
-              id="deviceCode"
-              autocomplete="username"
-              maxlength="80"
-              placeholder="Enter the registered device code"
-              required
-          /></label>
-          <label
-            >Device secret<input
-              id="deviceSecret"
-              type="password"
-              autocomplete="current-password"
-              maxlength="256"
-              required
-          /></label>
-          <button class="primary wide" type="submit">Connect scanner</button>
-          <div class="form-error" id="setupError"></div>
-        </form>
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b1f3a"><meta name="mobile-web-app-capable" content="yes">
+  <title>WTS QR Scanner</title><link rel="stylesheet" href="/scanner.css?v=9"><link rel="manifest" href="/scanner-manifest.webmanifest">
+</head>
+<body>
+  <header class="scanner-header"><a class="scanner-brand" href="/"><b><img src="/assets/wts-school-logo.jpg" alt=""></b><span>Attendance Scanner<small>Way to Success Standard Schools</small></span></a><div class="network-pill" id="networkPill"><i></i><span>Checking</span></div></header>
+  <main>
+    <section class="setup-card" id="setupCard">
+      <small class="eyebrow">REGISTER THIS PHONE</small><h1>Connect scanner</h1>
+      <p>Use the school’s general scanner password once on this phone.</p>
+      <form id="setupForm"><label>Phone name<input id="deviceName" maxlength="100" placeholder="Main gate phone" required></label><label>Scanner password<input id="scannerPassword" type="password" maxlength="256" required></label><button class="primary wide" type="submit">Register phone</button><div class="form-error" id="setupError"></div></form>
+    </section>
+    <section id="scannerApp" hidden>
+      <div class="device-strip"><div><small>REGISTERED PHONE</small><strong id="connectedDevice">—</strong></div><div class="queue-count"><small>OFFLINE</small><strong id="queueCount">0</strong></div><button class="text-button" id="forgetDevice" type="button">Forget phone</button></div>
+      <section class="mode-card compact-mode"><div class="mode-row"><button class="mode active" data-event="check_in" type="button">Morning arrival</button><button class="mode" data-event="check_out" type="button">Afternoon closing</button></div></section>
+      <section class="scan-card"><div class="scan-heading"><div><small class="eyebrow">QR ONLY</small><h1>Show QR to camera</h1></div><span class="source-badge">QR</span></div>
+        <div class="camera-box" id="cameraBox" hidden><video id="cameraVideo" playsinline muted></video><canvas id="cameraCanvas" hidden></canvas><div class="camera-target"></div><div class="camera-live"><i></i><span id="cameraStatus">Camera active</span></div></div>
+        <div class="tap-zone" id="tapZone"><div class="scan-icon">▣</div><strong>Camera ready</strong><span>Allow the camera, then show one QR at a time.</span></div>
+        <button class="primary wide scan-button" id="startScan" type="button">Start camera</button>
+        <details class="reader-fallback"><summary>Use a connected QR reader</summary><form class="reader-row" id="readerForm"><input id="credentialInput" autocomplete="off" placeholder="Waiting for QR reader" required><button class="secondary">Read QR</button></form></details>
       </section>
-
-      <section id="scannerApp" hidden>
-        <div class="device-strip">
-          <div>
-            <small>CONNECTED DEVICE</small
-            ><strong id="connectedDevice">—</strong>
-          </div>
-          <div class="queue-count">
-            <small>OFFLINE QUEUE</small><strong id="queueCount">0</strong>
-          </div>
-          <button class="text-button" id="openSettings" type="button">
-            Settings
-          </button>
-        </div>
-
-        <section class="mode-card compact-mode">
-          <div class="mode-row" role="group" aria-label="Attendance event type">
-            <button class="mode active" data-event="check_in" type="button">
-              Morning arrival
-            </button>
-            <button class="mode" data-event="check_out" type="button">
-              Afternoon closing
-            </button>
-          </div>
-          <div class="automatic-status"><i></i><span><b>Automatic scanner</b><small>Keep this page open. The next QR code will be read automatically.</small></span></div>
-        </section>
-
-        <section class="scan-card">
-          <div class="scan-heading">
-            <div>
-              <small class="eyebrow">ALWAYS READY</small>
-              <h1 id="scanTitle">Automatic QR camera</h1>
-            </div>
-            <span class="source-badge" id="sourceBadge">QR</span>
-          </div>
-
-          <div class="camera-box" id="cameraBox" hidden>
-            <video id="cameraVideo" playsinline muted></video>
-            <canvas id="cameraCanvas" hidden></canvas>
-            <div class="camera-target" aria-hidden="true"></div>
-            <div class="camera-live"><i></i><span id="cameraStatus">Camera active · Show the QR code</span></div>
-            <button class="camera-close" id="stopCamera" type="button">
-              Pause camera
-            </button>
-          </div>
-
-          <div class="tap-zone" id="tapZone">
-            <div class="scan-icon" id="scanIcon">▣</div>
-            <strong id="tapTitle">Camera permission needed</strong>
-            <span id="tapHelp"
-              >Allow the camera once. It will then start automatically whenever this scanner opens.</span
-            >
-          </div>
-
-          <button class="primary wide scan-button" id="startScan" type="button">
-            Allow and start camera
-          </button>
-          <details class="reader-fallback">
-            <summary>Use a connected QR reader</summary>
-            <form class="reader-row" id="readerForm">
-              <input
-                id="credentialInput"
-                autocomplete="off"
-                autocapitalize="off"
-                spellcheck="false"
-                placeholder="Waiting for connected QR reader"
-                minlength="1"
-                maxlength="512"
-                required
-              />
-              <button class="secondary" type="submit">Read QR code</button>
-            </form>
-          </details>
-        </section>
-
-        <section class="result-card idle" id="resultCard" aria-live="polite">
-          <div class="result-mark" id="resultMark">•</div>
-          <div class="result-copy">
-            <small id="resultCode">WAITING</small>
-            <h2 id="resultName">No scan yet</h2>
-            <p id="resultDetail">The next verified person will appear here.</p>
-          </div>
-        </section>
-
-        <section class="queue-card" id="queueCard">
-          <div>
-            <small class="eyebrow">OFFLINE EVENTS</small>
-            <h2>Pending synchronisation</h2>
-            <p id="queueMessage">No events are waiting.</p>
-          </div>
-          <div class="queue-actions">
-            <button class="secondary" id="syncQueue" type="button">
-              Sync now
-            </button>
-            <button class="text-button danger" id="clearFailed" type="button">
-              Clear failed
-            </button>
-          </div>
-          <div id="queueList"></div>
-        </section>
-      </section>
-    </main>
-
-    <dialog id="settingsDialog">
-      <form method="dialog" class="settings-box">
-        <div class="dialog-head">
-          <div>
-            <small class="eyebrow">SCANNER SETTINGS</small>
-            <h2>Device configuration</h2>
-          </div>
-          <button class="dialog-close" value="cancel" aria-label="Close">
-            ×
-          </button>
-        </div>
-        <div class="setting-meta">
-          <span>Installation ID</span><code id="installationPreview">—</code>
-        </div>
-        <button
-          class="primary wide"
-          id="saveSettings"
-          value="cancel"
-          type="button"
-        >
-          Save settings
-        </button>
-        <button
-          class="secondary wide"
-          id="installScanner"
-          value="cancel"
-          type="button"
-          hidden
-        >
-          Install scanner on this device
-        </button>
-        <button
-          class="danger-button wide"
-          id="forgetDevice"
-          value="cancel"
-          type="button"
-        >
-          Forget this device
-        </button>
-      </form>
-    </dialog>
-
-    <div id="toasts"></div>
-    <script src="/vendor.bundle.js?v=8"></script>
-    <script src="/scanner.js?v=8"></script>
-  </body>
+      <section class="result-card idle" id="resultCard" aria-live="polite"><div class="result-mark" id="resultMark">•</div><div class="result-copy"><small id="resultCode">WAITING</small><h2 id="resultName">No scan yet</h2><p id="resultDetail">The next verified person will appear here.</p></div></section>
+      <section class="queue-card"><div><small class="eyebrow">OFFLINE RECORDS</small><h2>Waiting to synchronize</h2><p id="queueMessage">No records waiting.</p></div><div class="queue-actions"><button class="secondary" id="syncQueue" type="button">Sync with admin password</button></div><div id="queueList"></div></section>
+    </section>
+  </main>
+  <dialog id="earlyReasonDialog"><form method="dialog" class="settings-box" id="earlyReasonForm"><h2>Reason for early closing</h2><p>Closing before 3:30 PM must include a reason.</p><label>Reason<textarea id="earlyReason" rows="3" maxlength="500" required></textarea></label><div class="dialog-actions"><button class="secondary" value="cancel">Cancel</button><button class="primary" value="default">Continue</button></div></form></dialog>
+  <dialog id="syncDialog"><form method="dialog" class="settings-box" id="syncForm"><h2>Authorize offline sync</h2><p>The administrative password is required every time.</p><label>Administrative password<input id="syncAdminPassword" type="password" required></label><div class="dialog-actions"><button class="secondary" value="cancel">Cancel</button><button class="primary" value="default">Synchronize</button></div></form></dialog>
+  <div id="toasts"></div><script src="/vendor.bundle.js?v=9"></script><script src="/scanner.js?v=9"></script>
+</body>
 </html>

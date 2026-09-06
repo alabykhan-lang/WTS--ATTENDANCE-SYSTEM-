@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1f3a">
-  <meta name="description" content="WTS Attendance System — QR-first school attendance records.">
+  <meta name="description" content="Way to Success QR attendance system">
   <title>WTS Attendance System</title>
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/auth.css">
@@ -14,22 +14,19 @@
   <section class="auth-gate" id="authGate">
     <form id="gateForm" class="auth-card">
       <div class="auth-logo"><img src="/assets/wts-school-logo.jpg" alt="Way to Success Standard Schools logo"></div>
-      <small>WAY TO SUCCESS STANDARD SCHOOLS, EJIGBO</small>
-      <h1>Attendance System</h1>
-      <p>Sign in with the same WTS staff identity used across the school systems.</p>
-      <label>Staff number or official email<input id="loginId" autocomplete="username" autocapitalize="none" required></label>
+      <small>WAY TO SUCCESS STANDARD SCHOOLS, EJIGBO</small><h1>Attendance System</h1>
+      <p>Sign in with your WTS staff identity.</p>
+      <label>Staff number or official email<input id="loginId" autocomplete="username" required></label>
       <label>Password<div class="password-input-wrap"><input id="loginPassword" type="password" autocomplete="current-password" required><button class="password-toggle" id="passwordToggle" type="button">Show password</button></div></label>
-      <button class="primary wide" id="attendanceSignIn" type="submit">Sign in to Attendance</button>
+      <button class="primary wide" id="attendanceSignIn" type="submit">Sign in</button>
       <div class="auth-error" id="authError" role="alert"></div>
-      <p class="auth-footnote">Attendance uses the central WTS identity. No separate account is created.</p>
     </form>
   </section>
 
   <div class="shell">
     <aside class="sidebar">
-      <div class="brand"><span class="brand-mark"><img src="/assets/wts-school-logo.jpg" alt=""></span><span><b>Attendance</b><small>QR-first school records</small></span></div>
-      <nav aria-label="Primary attendance navigation">
-        <small class="nav-label">WTS ATTENDANCE</small>
+      <div class="brand"><span class="brand-mark"><img src="/assets/wts-school-logo.jpg" alt=""></span><span><b>Attendance</b><small>Way to Success</small></span></div>
+      <nav aria-label="Attendance navigation">
         <button class="nav active" data-view="overview"><span>01</span>Dashboard</button>
         <button class="nav" data-view="scan"><span>02</span>Take Attendance</button>
         <button class="nav" data-view="reports"><span>03</span>Analysis</button>
@@ -40,86 +37,67 @@
     </aside>
 
     <main>
-      <header class="topbar">
-        <div><small class="eyebrow">WAY TO SUCCESS STANDARD SCHOOLS, EJIGBO</small><h1 id="title">Dashboard</h1><p id="subtitle">Today’s attendance in one place.</p></div>
-        <div class="actions"><button class="ghost" id="refresh" type="button">Refresh</button><button class="primary" id="login" type="button">Sign out</button></div>
-      </header>
-
-      <div class="context-strip"><span class="context-name">CURRENT SCHOOL PERIOD</span><strong id="contextPill">Checking school period</strong><span class="context-date" id="today"></span></div>
+      <header class="topbar"><div><small class="eyebrow">WAY TO SUCCESS STANDARD SCHOOLS</small><h1 id="title">Dashboard</h1><p id="subtitle">Today’s attendance.</p></div><div class="actions"><button class="ghost" id="refresh" type="button">Refresh</button><button class="primary" id="login" type="button">Sign out</button></div></header>
+      <div class="context-strip"><strong id="contextPill">Checking school period</strong><span id="today"></span></div>
 
       <section class="view active" id="view-overview">
-        <div class="page-head dashboard-head"><div><small class="eyebrow">DAILY ATTENDANCE</small><h2 id="todayHeading">Attendance for today</h2><p>The totals update from the QR scans received for the selected register.</p></div><div class="dashboard-controls"><div class="slot-switch" role="group" aria-label="Dashboard attendance session"><button class="slot-button active" data-dashboard-slot="morning" type="button">Morning</button><button class="slot-button" data-dashboard-slot="afternoon" type="button">Afternoon</button></div></div></div>
+        <div class="page-head"><div><small class="eyebrow">TODAY</small><h2 id="todayHeading">Daily attendance</h2></div><div class="slot-switch"><button class="slot-button active" data-dashboard-slot="morning" type="button">AM</button><button class="slot-button" data-dashboard-slot="afternoon" type="button">PM</button></div></div>
         <div class="overview-counters">
-          <article class="attendance-counter accent-blue"><span id="staffCounterLabel">Staff signed in</span><strong id="tPresent">0</strong><small>QR attendance records</small></article>
-          <article class="attendance-counter accent-mint"><span id="studentCounterLabel">Students signed in</span><strong id="sPresent">0</strong><small>QR attendance records</small></article>
+          <article class="attendance-counter accent-blue"><span>Staff</span><strong id="staffCount">0</strong><small id="staffCountLabel">arrived this morning</small></article>
+          <article class="attendance-counter accent-mint"><span>Students</span><strong id="studentCount">0</strong><small id="studentCountLabel">arrived this morning</small></article>
         </div>
-        <div class="dashboard-live"><span class="live-dot" aria-hidden="true"></span><div><strong>Live QR attendance</strong><small>New scans appear here as the scanner transmits them. Saved scanner files can be synchronized from Setup.</small></div><button class="primary" data-go="scan" type="button">Take Attendance</button></div>
       </section>
 
       <section class="view" id="view-scan">
-        <div class="page-head"><div><small class="eyebrow">QR ATTENDANCE</small><h2>Take Attendance</h2><p>Open the scanner for the register being recorded. Every person scans once; morning and afternoon records remain separate.</p></div></div>
-        <article class="capture-card">
-          <div class="capture-copy"><span class="capture-mark">QR</span><div><small class="eyebrow">FOCUSED SCANNER</small><h2>Scan and move on</h2><p>The camera or connected QR reader records the scanner time. If the scanner stores records offline, Setup imports the original scan times later.</p></div></div>
-          <div class="capture-options"><a class="primary capture-option" href="/scanner?event=check_in"><strong>Morning arrival</strong><small>Open the morning scanner</small></a><a class="ghost capture-option" href="/scanner?event=check_out"><strong>Afternoon closing</strong><small>Open the afternoon scanner</small></a></div>
-        </article>
+        <div class="page-head"><div><small class="eyebrow">QR ONLY</small><h2>Take Attendance</h2><p>Choose the register and open the focused scanner.</p></div></div>
+        <div class="qr-generation-grid">
+          <a class="capture-card capture-option" href="/scanner?event=check_in"><span class="capture-mark">AM</span><div><h2>Morning arrival</h2><p>One scan per person.</p></div></a>
+          <a class="capture-card capture-option" href="/scanner?event=check_out"><span class="capture-mark">PM</span><div><h2>Afternoon closing</h2><p>Early closing requires a reason before 3:30 PM.</p></div></a>
+        </div>
       </section>
 
       <section class="view" id="view-reports">
-        <div class="page-head"><div><small class="eyebrow">ATTENDANCE REPORTS</small><h2>Analysis</h2><p>Prepare student and staff attendance reports by day, week, month, term or session.</p></div></div>
-        <div class="analysis-tabs" role="tablist" aria-label="Analysis sections"><button class="analysis-tab active" data-analysis="students" role="tab" aria-selected="true" type="button">Students</button><button class="analysis-tab" data-analysis="staff" role="tab" aria-selected="false" type="button">Staff</button></div>
-
-        <section class="analysis-panel active" id="analysis-students">
-          <div class="toolbar filter-bar"><label>From<input type="date" id="reportFrom"></label><label>To<input type="date" id="reportTo"></label><label>Class<select id="reportClass"><option value="">All classes</option></select></label><label>Report<select id="reportType"><option value="term">Term / period summary</option><option value="weekly">Weekly breakdown</option><option value="monthly">Monthly breakdown</option><option value="session">Session history</option></select></label><button class="primary" id="runReport" type="button">Run analysis</button><button class="ghost" id="printReport" type="button">Print analysis</button></div>
-          <div id="reportSummary" class="report-summary"></div>
-          <div class="report-columns"><article class="card"><div class="card-heading"><div><small class="eyebrow">CLASS SUMMARY</small><h2>Attendance by class</h2></div></div><div id="classReportRows" class="report-list"></div></article><article class="card"><div class="card-heading"><div><small class="eyebrow">STUDENT SUMMARY</small><h2>Attendance by student</h2></div></div><div id="studentReportRows" class="report-list"></div></article></div>
-          <article class="card period-report-card"><div class="card-heading"><div><small class="eyebrow">PERIOD VIEW</small><h2 id="periodReportTitle">Selected period</h2></div><span class="muted">Only eligible sessions are counted</span></div><div id="periodReportRows" class="report-list"></div></article>
-        </section>
-
-        <section class="analysis-panel" id="analysis-staff">
-          <article class="card"><div class="inline-heading"><div><small class="eyebrow">STAFF ATTENDANCE</small><h2>Staff attendance reports</h2><p>Choose an individual record or review the general school report.</p></div><button class="ghost" id="loadStaffAnalysis" type="button">Refresh</button></div><div class="analysis-mode-switch" role="group" aria-label="Staff report type"><button class="analysis-mode active" data-staff-mode="general" type="button">General report</button><button class="analysis-mode" data-staff-mode="individual" type="button">Individual attendance</button></div><div id="staffGeneralView"><div class="metrics four compact"><article class="metric-card accent-blue"><span>Staff expected</span><strong id="staffExpected">0</strong><small>Attendance-required staff</small></article><article class="metric-card accent-mint"><span>Signed in</span><strong id="staffPresent">0</strong><small>Selected date</small></article><article class="metric-card accent-gold"><span>Late</span><strong id="staffLate">0</strong><small>Arrival exceptions</small></article><article class="metric-card accent-red"><span>Not yet seen</span><strong id="staffWaiting">0</strong><small>Open staff records</small></article></div><div class="staff-register-heading"><div><small class="eyebrow">DAILY STAFF REGISTER</small><h3>Arrival and closing</h3><p>Print the daily record when the day is complete.</p></div><div class="button-row"><label class="date-inline">Date<input type="date" id="staffLogbookDate"></label><button class="ghost" id="refreshStaffLogbook" type="button">Refresh</button><button class="primary" id="printStaffLogbook" type="button">Print register</button></div></div><div class="table-wrap"><table><thead><tr><th>S/N</th><th>Staff name</th><th>Staff number</th><th>Position</th><th>Arrival</th><th>Status</th><th>Closing</th><th>Closing status</th><th>Method</th></tr></thead><tbody id="staffLogbookRows"><tr><td colspan="9" class="empty">No staff attendance has been recorded for this date.</td></tr></tbody></table></div></div><div id="staffIndividualView" hidden><div class="toolbar compact-toolbar"><label class="grow">Staff member<select id="staffAnalysisPerson"><option value="">Choose a staff member</option></select></label><label>From<input type="date" id="staffHistoryFrom"></label><label>To<input type="date" id="staffHistoryTo"></label><button class="ghost" id="loadStaffHistory" type="button">Show history</button></div><div id="staffHistoryRows" class="report-list"><div class="empty">Choose a staff member to view daily, weekly, monthly and term records.</div></div></div></article>
-        </section>
+        <div class="page-head"><div><small class="eyebrow">ATTENDANCE RECORDS</small><h2>Analysis</h2><p>Choose students or staff, then an individual or general record.</p></div><button class="ghost" id="printAnalysis" type="button">Print</button></div>
+        <article class="card">
+          <div class="analysis-tabs"><button class="analysis-tab active" data-person-type="student" type="button">Students</button><button class="analysis-tab" data-person-type="staff" type="button">Staff</button></div>
+          <div class="analysis-mode-switch"><button class="analysis-mode active" data-analysis-mode="general" type="button">General</button><button class="analysis-mode" data-analysis-mode="individual" type="button">Individual</button></div>
+          <div class="toolbar filter-bar">
+            <label>Period<select id="analysisPeriod"><option value="day">Day</option><option value="week">Week</option><option value="month">Month</option><option value="term">Term</option></select></label>
+            <label>Date<input id="analysisDate" type="date"></label>
+            <label id="analysisClassWrap">Class<select id="analysisClass"><option value="">Choose class</option></select></label>
+            <label id="analysisPersonWrap" hidden>Person<select id="analysisPerson"><option value="">Choose person</option></select></label>
+            <button class="primary" id="runAnalysis" type="button">Show attendance</button>
+          </div>
+          <div id="analysisSummary" class="report-summary"></div>
+          <div class="table-wrap"><table id="analysisTable"><thead id="analysisHead"></thead><tbody id="analysisRows"><tr><td class="empty">Choose the report above.</td></tr></tbody></table></div>
+        </article>
       </section>
 
       <section class="view" id="view-settings">
-        <div class="page-head"><div><small class="eyebrow">DEVICE CONFIGURATION</small><h2>Setup</h2><p>Authorize the QR scanners and synchronize saved scanner records.</p></div></div>
-        <div class="setup-grid setup-grid-two"><button class="setup-card" data-go="devices" type="button"><span class="setup-icon mint-bg">⌁</span><strong>QR scanner devices</strong><small>Authorize school scanners, their location and how they connect.</small><span id="setupDeviceSummary">Open device setup →</span></button><button class="setup-card" data-go="imports" type="button"><span class="setup-icon gold-bg">↺</span><strong>Offline synchronization</strong><small>Import saved scanner records with the original scan time.</small><span id="setupImportSummary">Open offline sync →</span></button></div>
+        <div class="page-head"><div><small class="eyebrow">SYSTEM SETUP</small><h2>Setup</h2><p>Passwords, scanner phones, school location, and offline records.</p></div></div>
+        <div class="setup-grid setup-grid-two">
+          <article class="card"><h2>Administrative password</h2><p>Required every time offline attendance is synchronized.</p><form id="adminPasswordForm"><label>New password<input id="newAdminPassword" type="password" minlength="8" required></label><label>Confirm password<input id="confirmAdminPassword" type="password" minlength="8" required></label><button class="primary" type="submit">Set / reset password</button></form></article>
+          <article class="card"><h2>Scanner password</h2><p>One general password registers any approved phone. Resetting it disconnects every phone.</p><form id="scannerPasswordForm"><label>Administrative password<input id="scannerAdminPassword" type="password" required></label><label>New scanner password<input id="newScannerPassword" type="password" minlength="6" required></label><label>Confirm password<input id="confirmScannerPassword" type="password" minlength="6" required></label><button class="primary" type="submit">Set / reset scanner password</button></form></article>
+          <article class="card"><h2>School location</h2><form id="locationForm"><label>Location name<input id="locationLabel" placeholder="Main school gate"></label><div class="toolbar"><label>Latitude<input id="locationLatitude" type="number" step="any"></label><label>Longitude<input id="locationLongitude" type="number" step="any"></label><label>Radius (metres)<input id="locationRadius" type="number" min="10"></label></div><label>Administrative password<input id="locationAdminPassword" type="password" required></label><button class="primary" type="submit">Save location</button></form></article>
+          <article class="card"><div class="inline-heading"><div><h2>Registered phones</h2><p>Phones appear here after using the scanner password.</p></div><button class="ghost" id="openScanner" type="button">Open scanner</button></div><div id="installationList" class="batch-list"></div></article>
+        </div>
+        <article class="card import-uploader"><h2>Import offline attendance</h2><p>Only saved QR records are accepted. Original scan times are kept.</p><input id="offlineFile" type="file" accept=".csv,.txt,.tsv,.json"><label>Administrative password<input id="offlineAdminPassword" type="password"></label><button class="primary" id="importOffline" type="button">Authorize and import</button><div id="offlineStatus" class="muted">No file selected.</div></article>
       </section>
 
       <section class="view" id="view-credentials">
-        <div class="page-head"><div><small class="eyebrow">SCHOOL OFFICE</small><h2>QR Codes Generation</h2><p>Generate every student and staff QR as an image or PDF, individually or class by class. Lost codes can be replaced.</p></div></div>
+        <div class="page-head"><div><small class="eyebrow">SCHOOL OFFICE</small><h2>QR Codes Generation</h2><p>Generate individual, class, student, or staff QR sets.</p></div></div>
         <div class="qr-generation-grid">
-          <article class="card qr-generation-card"><div class="card-heading"><div><small class="eyebrow">STUDENTS</small><h2>Generate student QRs</h2><p>Prepare one class or the complete active student set.</p></div><span class="qr-panel-icon">QR</span></div><label class="bulk-class-field">Class<select id="qrBatchClass"><option value="">Choose a class</option></select></label><div class="button-row qr-batch-actions"><button class="primary" id="downloadClassQr" type="button">Generate class QRs</button><button class="ghost" id="downloadAllStudentQr" type="button">Generate all students</button></div></article>
-          <article class="card qr-generation-card"><div class="card-heading"><div><small class="eyebrow">STAFF</small><h2>Generate staff QRs</h2><p>Prepare the complete active staff set.</p></div><span class="qr-panel-icon">QR</span></div><button class="primary wide" id="downloadStaffQr" type="button">Generate staff QRs</button></article>
+          <article class="card"><h2>Student QRs</h2><label>Class<select id="qrBatchClass"><option value="">Choose class</option></select></label><div class="button-row"><button class="primary" id="downloadClassQr" type="button">Class QRs</button><button class="ghost" id="downloadAllStudentQr" type="button">All students</button></div></article>
+          <article class="card"><h2>Staff QRs</h2><button class="primary" id="downloadStaffQr" type="button">All staff</button></article>
         </div>
-        <p id="qrBatchStatus" class="small-note qr-status">Generated codes can be downloaded or printed as QR sheets or ID-card back covers.</p>
-        <article class="card qr-individual-card"><div class="card-heading"><div><small class="eyebrow">INDIVIDUAL QR</small><h2>Generate one person’s QR</h2><p>Find a student or staff member from the official school records.</p></div></div><div class="compact-toolbar"><label class="grow">Name or school number<input id="credentialSearch" placeholder="Search the school records"></label><label>Person<select id="credentialPersonType"><option value="student">Student</option><option value="staff">Staff</option></select></label><button class="ghost" id="searchCredentials" type="button">Find</button></div><div id="credentialPeople" class="people-list"></div></article>
-        <article class="card detail-panel qr-detail-card"><div id="credentialEmpty" class="empty">Select one person to generate or reprint the QR.</div><div id="credentialDetail" hidden><div class="person-heading"><div class="avatar" id="credentialAvatar">W</div><div><small class="eyebrow" id="credentialKind">CENTRAL REGISTRY</small><h2 id="credentialName"></h2><p id="credentialMeta"></p></div></div><section class="credential-method"><div class="method-heading"><span>QR</span><div><b>Permanent attendance QR</b><small>The same code stays valid until an authorized replacement is issued.</small></div></div><div class="button-row"><button class="primary" id="issueQr" type="button">Generate / show QR</button><button class="ghost" id="showQrAgain" type="button">Show again</button></div></section><div class="card-subheading"><h3>QR history</h3><span class="muted">Lost or damaged used codes can be replaced.</span></div><div id="credentialList" class="credential-list"></div></div></article>
+        <article class="card"><h2>Individual QR</h2><div class="toolbar"><label>Person type<select id="credentialPersonType"><option value="student">Student</option><option value="staff">Staff</option></select></label><label class="grow">Name or number<input id="credentialSearch"></label><button class="ghost" id="searchCredentials" type="button">Find</button></div><div id="credentialPeople" class="people-list"></div></article>
       </section>
-
-      <section class="view" id="view-devices">
-        <div class="page-head"><div><small class="eyebrow">SETUP · DEVICES</small><h2>Authorized QR devices</h2><p>Only an active authorized device may send live or saved QR records to Attendance.</p></div><div class="button-row"><button class="ghost" data-go="settings" type="button">Back to Setup</button><button class="primary" id="addDevice" type="button">Add QR device</button></div></div>
-        <div id="deviceGrid" class="device-grid"></div><div class="empty card-empty" id="deviceEmpty">No authorized QR device has been added.</div>
-      </section>
-
-      <section class="view" id="view-imports">
-        <div class="page-head"><div><small class="eyebrow">SETUP · OFFLINE IMPORTS</small><h2>Offline imports</h2><p>Retrieve saved scanner records here. Attendance uses the original scan timestamp, not the later upload time.</p></div><button class="ghost" data-go="settings" type="button">Back to Setup</button></div>
-        <article class="card import-uploader"><div class="upload-drop"><div class="upload-icon">↑</div><div><h2>Choose a saved scanner file</h2><p>Preview first. Nothing is confirmed until an authorized administrator approves it.</p></div><input id="importFile" type="file" accept=".csv,.xlsx,.xls,.txt,.tsv"></div><div class="toolbar import-options"><label>Device<select id="importDevice"><option value="">Choose a device if known</option></select></label><label>File type<select id="importAdapter"><option value="generic_delimited">Text file</option><option value="generic_csv">CSV file</option><option value="generic_xlsx">Excel file</option></select></label><button class="primary" id="previewImport" type="button">Preview file</button></div><div id="importFileStatus" class="muted">No file selected.</div></article>
-        <article class="card import-preview" id="importPreview" hidden><div class="card-heading"><div><small class="eyebrow">REVIEW BEFORE CONFIRMING</small><h2 id="importPreviewTitle">File preview</h2></div><button class="primary" id="confirmImport" type="button">Authorize and save</button></div><div id="importSummary" class="import-summary"></div><div class="table-wrap"><table><thead><tr><th>Row</th><th>QR / device identifier</th><th>Original scan time</th><th>Direction</th><th>Identity status</th><th>Note</th></tr></thead><tbody id="importRows"></tbody></table></div></article>
-        <article class="card"><div class="inline-heading"><div><small class="eyebrow">IMPORT HISTORY</small><h2>Previous imports</h2></div><button class="text-button" id="refreshImports" type="button">Refresh</button></div><div id="importBatches" class="batch-list"></div></article>
-      </section>
-
     </main>
   </div>
 
-  <dialog id="qrDialog"><div class="secret-box qr-print-sheet"><button class="dialog-close" id="closeQr" aria-label="Close" type="button">×</button><div id="qrPrintArea" class="qr-print-area"></div><aside class="secret-controls"><h2 id="qrTitle">Attendance QR ready</h2><p id="qrIntro">The complete QR code is ready for download or printing.</p><div class="dialog-actions"><button class="ghost" id="downloadQrPng" hidden type="button">Download QR PNG</button><button class="ghost" id="printQrDialog" type="button">Print / save QR PDF</button><button class="ghost" id="printQrBackCovers" hidden type="button">Print ID-card back covers</button><button class="primary" id="closeQrButton" type="button">Done</button></div></aside></div></dialog>
-
-  <dialog id="deviceDialog"><form id="deviceForm" class="setup-dialog"><div class="dialog-heading"><div><small class="eyebrow">ADD A SCHOOL DEVICE</small><h2>Authorize a QR scanner</h2><p>The device code and secret identify this station. The secret is shown once.</p></div></div><label>Device name<input id="newDeviceName" required maxlength="100" placeholder="Main gate QR scanner"></label><label>Location<input id="newDeviceLocation" maxlength="100" placeholder="Main gate"></label><label>Connection<select id="newDeviceConnection"><option value="wifi">Wi-Fi</option><option value="cellular">Mobile data</option><option value="offline">Saved file only</option></select></label><label class="check-row"><input id="newDeviceOffline" type="checkbox" checked><span><b>Keep scans if internet stops</b><small>Original scan time will be preserved for later synchronization.</small></span></label><label>Device code<input id="newDeviceCode" readonly></label><div class="dialog-actions"><button type="button" class="ghost" id="cancelDevice">Cancel</button><button class="primary" type="submit">Create device login</button></div></form></dialog>
-  <dialog id="deviceReadyDialog"><div class="setup-dialog device-ready"><small class="eyebrow">DEVICE LOGIN CREATED</small><h2>Use these values on the QR scanner</h2><p>The secret is shown only now. Keep it private.</p><div class="device-login-value"><span>Device code</span><code id="readyDeviceCode"></code></div><div class="device-login-value"><span>Device secret</span><code id="readyDeviceSecret"></code></div><div class="dialog-actions"><button class="ghost" id="copyDeviceLogin" type="button">Copy both</button><a class="ghost link-button" href="/scanner">Open scanner</a><button class="primary" id="closeDeviceReady" type="button">Done</button></div></div></dialog>
-  <dialog id="requiredPasswordDialog"><form method="dialog" id="requiredPasswordForm" class="auth-card password-dialog"><h2>Create your WTS password</h2><p>Your Central Registry account requires a password change before Attendance can open.</p><label>New password<div class="password-input-wrap"><input id="requiredPassword" type="password" autocomplete="new-password" minlength="10" maxlength="512" required><button class="password-toggle" type="button" data-password-toggle="requiredPassword">Show password</button></div></label><label>Confirm password<div class="password-input-wrap"><input id="requiredPasswordConfirm" type="password" autocomplete="new-password" minlength="10" maxlength="512" required><button class="password-toggle" type="button" data-password-toggle="requiredPasswordConfirm">Show password</button></div></label><div class="auth-error" id="requiredPasswordError" role="alert"></div><div class="dialog-actions"><button type="button" class="ghost" id="requiredPasswordCancel">Cancel</button><button class="primary" value="default">Save password</button></div></form></dialog>
+  <dialog id="qrDialog"><div class="secret-box qr-print-sheet"><button class="dialog-close" id="closeQr" type="button">×</button><div id="qrPrintArea" class="qr-print-area"></div><aside class="secret-controls"><h2 id="qrTitle">QR ready</h2><div class="dialog-actions"><button class="ghost" id="downloadQrPng" type="button">Download PNG</button><button class="ghost" id="printQrDialog" type="button">Print / PDF</button><button class="ghost" id="printQrBackCovers" type="button">ID-card backs</button><button class="primary" id="closeQrButton" type="button">Done</button></div></aside></div></dialog>
+  <dialog id="requiredPasswordDialog"><form method="dialog" id="requiredPasswordForm" class="auth-card password-dialog"><h2>Create your WTS password</h2><label>New password<input id="requiredPassword" type="password" minlength="10" required></label><label>Confirm password<input id="requiredPasswordConfirm" type="password" minlength="10" required></label><div class="auth-error" id="requiredPasswordError"></div><div class="dialog-actions"><button type="button" class="ghost" id="requiredPasswordCancel">Cancel</button><button class="primary">Save password</button></div></form></dialog>
   <div id="toasts" aria-live="polite"></div>
-  <script src="/config.js"></script>
-  <script src="/identity-login.js"></script>
-  <script src="/vendor.bundle.js"></script>
-  <script src="/app.js"></script>
+  <script src="/config.js"></script><script src="/identity-login.js"></script><script src="/vendor.bundle.js"></script><script src="/app.js"></script>
 </body>
 </html>

@@ -12,28 +12,10 @@ import {
 } from "../lib/attendance-api.js";
 
 const OPERATOR_RPCS = new Set([
-  "attendance_universal_admin_read_api",
-  "attendance_notebook_read_api",
-  "attendance_notebook_write_api",
-  "attendance_universal_admin_write_api",
+  "attendance_strict_read_api",
+  "attendance_strict_write_api",
   "attendance_qr_card_api",
-  "attendance_admin_read_api",
-  "attendance_admin_write_api",
-  "staff_attendance_admin_read_api",
-  "staff_attendance_admin_write_api",
-  "attendance_controls_admin_read_api",
-  "attendance_controls_admin_write_api",
 ]);
-
-// Supabase REST workers can briefly retain different schema-cache generations after
-// an additive RPC is created. Keep both the established and universal Attendance
-// names available; the shared adapter retries a 404 before trying the alternate.
-const RPC_COMPATIBILITY_ALIASES = Object.freeze({
-  attendance_universal_admin_read_api: ["attendance_universal_admin_read_api", "attendance_admin_read_api"],
-  attendance_universal_admin_write_api: ["attendance_universal_admin_write_api", "attendance_admin_write_api"],
-  attendance_admin_read_api: ["attendance_admin_read_api", "attendance_universal_admin_read_api"],
-  attendance_admin_write_api: ["attendance_admin_write_api", "attendance_universal_admin_write_api"],
-});
 
 export default async function handler(req, res) {
   const startedAt = Date.now();
@@ -51,12 +33,7 @@ export default async function handler(req, res) {
   let result;
   if (OPERATOR_RPCS.has(name)) {
     if (!action || action.length > 120) return sendJson(res, { ok: false, code: "ATTENDANCE_ACTION_REQUIRED" }, 400);
-    const rpcName =
-      name === "attendance_universal_admin_write_api" &&
-      ["issueQr", "replaceQr", "refreshUnusedQr"].includes(action)
-        ? "attendance_qr_card_api"
-        : RPC_COMPATIBILITY_ALIASES[name] || name;
-    result = await supabaseRpc(rpcName, { p_client_code: local.clientCode, p_client_secret: local.clientSecret, p_action: action, p_payload: payload });
+    result = await supabaseRpc(name, { p_client_code: local.clientCode, p_client_secret: local.clientSecret, p_action: action, p_payload: payload });
   } else if (name === "attendance_roster_sync_status_api") {
     result = await supabaseRpc(name, { p_session_id: central.session.sessionId, p_session_secret: central.session.sessionSecret });
   } else if (name === "attendance_roster_sync_api") {

@@ -1097,6 +1097,22 @@ dialog::backdrop { background: rgba(7, 24, 43, .65); }
   .table-wrap { overflow: visible; }
 }
 
+/* Strict five-area workspace additions. */
+.setup-grid article form { display: grid; gap: 14px; margin-top: 18px; }
+.setup-grid article form .toolbar { margin: 0; }
+.setup-grid article p { color: var(--muted); line-height: 1.55; }
+.official-signature { display: block; width: 86px; height: 32px; object-fit: contain; }
+#analysisTable td, #analysisTable th { white-space: nowrap; }
+#analysisTable td:nth-child(2) { white-space: normal; min-width: 180px; }
+
+@media print {
+  .sidebar, .topbar, .context-strip, .page-head button, .analysis-tabs,
+  .analysis-mode-switch, .filter-bar, #view-overview, #view-scan,
+  #view-settings, #view-credentials { display: none !important; }
+  .shell, main, #view-reports, #view-reports .card { display: block !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; border: 0 !important; }
+  #analysisTable { width: 100%; font-size: 11pt; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
