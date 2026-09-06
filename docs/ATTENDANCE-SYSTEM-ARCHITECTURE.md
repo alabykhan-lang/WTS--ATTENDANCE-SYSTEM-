@@ -40,16 +40,16 @@ The central office searches existing Central Registry students or staff and work
 
 The existing secure scanner is the dedicated QR capture application. It can use its camera or accept input from a connected QR reader. A future standalone Wi-Fi/mobile QR terminal can post directly to the device intake contract. Confirmed events can arrive in real time, remain in the scanner's encrypted offline queue for automatic retry, or be transferred from other equipment and imported as CSV, XLSX or delimited text. Every import is previewed, checksum-protected and held for identity resolution before confirmation.
 
-The notebook’s Take Attendance area includes a controlled manual AM/PM class register for cases where scanning is unavailable. A blank row is incomplete and prevents confirmation; confirmed registers are locked. Staff attendance is recorded through the same QR intake or controlled staff workflow, then shown in the daily logbook. Absence/not-yet-scanned state is derived from the expected Central Registry roster and confirmed attendance events. Unusual cases use the controlled correction workflow so original events and the review trail remain auditable.
+The notebook’s Take Attendance area is QR-only. Morning and afternoon scans remain separate, duplicate scans are controlled, and offline scanner files preserve their original event time during synchronization. Staff attendance is recorded through the same QR intake and then shown in the daily logbook. Absence/not-yet-scanned state is derived from the expected Central Registry roster and confirmed attendance events. Original events and the audit trail remain preserved in the protected data layer.
 
 ## Notebook screen contract
 
 The operator workspace has five primary areas:
 
-1. **Dashboard** — date, morning/afternoon switch, student and staff counters, unconfirmed classes, capture health and recent events.
-2. **Take Attendance** — the focused QR scanner link, morning/afternoon mode, manual class register, save/confirm/lock controls and scan feedback.
-3. **Analysis** — student and class reports, period breakdowns, staff history and a printable staff arrival/closing logbook.
-4. **Setup** — official Central Registry context, roster status, authorized QR devices, offline import centre and correction access.
+1. **Dashboard** — date, morning/afternoon switch, and live student/staff signed-in or signed-out totals.
+2. **Take Attendance** — the focused QR scanner link for morning arrival or afternoon closing. There is no manual marking workflow.
+3. **Analysis** — student/class reports, period breakdowns, individual staff history, general staff reports and the printable staff arrival/closing logbook.
+4. **Setup** — authorized QR devices and the offline import centre.
 5. **QR Codes Generation** — individual, class and staff QR output with revocation/replacement history.
 
 The scanner page is intentionally a separate, phone-friendly operational surface. It does not require staff to navigate the management workspace during gate operation.

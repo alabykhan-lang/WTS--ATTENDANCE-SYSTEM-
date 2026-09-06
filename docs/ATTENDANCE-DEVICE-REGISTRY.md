@@ -1,6 +1,6 @@
 # Attendance Device Registry
 
-The Device Registry contains only real school-owned or authorised devices. The current operational device is a QR camera/reader or standalone QR terminal. The registry also supports a saved-file import source and the controlled manual register source. A future device may use Wi-Fi, mobile data, Ethernet or another documented transport, but it must still authenticate to the Attendance intake boundary.
+The Device Registry contains only real school-owned or authorised QR devices. The current operational device is a QR camera/reader or standalone QR terminal. The registry also supports saved scanner-file synchronization. A future device may use Wi-Fi, mobile data or another documented QR transport, but it must still authenticate to the Attendance intake boundary.
 
 Each device record includes its code, name, category, manufacturer/model/serial metadata where supplied, firmware, physical location, connection/import method, supported sources, time-zone and health/synchronisation fields, clock-drift allowance metadata, ownership/deployment mode, status and audit history.
 

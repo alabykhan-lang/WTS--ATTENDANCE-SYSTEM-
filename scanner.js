@@ -213,7 +213,7 @@
     $("#tapHelp").textContent = copy[2];
     $("#startScan").textContent = copy[3] || copy[1];
     $("#scanIcon").textContent = "▣";
-    $("#credentialInput").placeholder = "Enter a QR value only if the camera cannot be used";
+    $("#credentialInput").placeholder = "Waiting for connected QR reader";
     $(".reader-fallback").open = false;
   }
 
@@ -614,7 +614,7 @@
         "error",
         "CAMERA_UNAVAILABLE",
         "Camera scanner unavailable",
-        "Use the credential input or a connected reader.",
+        "Use the camera or connect a QR reader.",
       );
     if (!("BarcodeDetector" in window) && !window.WTS_VENDOR?.jsQR)
       return showResult(

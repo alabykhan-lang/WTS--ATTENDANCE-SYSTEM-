@@ -11,19 +11,17 @@
     students: [],
     staff: [],
     selectedPerson: null,
-    import: { batchId: null, rows: [], selectedRowId: null, file: null },
-    mapPeople: [],
+    import: { batchId: null, rows: [], file: null },
     lastQr: null,
     lastQrPersonId: null,
     lastQrCodes: [],
     qrBatchBusy: false,
-    rosterSync: null,
     dashboardSlot: "morning",
-    register: { date: "", slot: "morning", classKey: "", rows: [], lock: {} },
     staffPeople: [],
     staffLogbook: [],
     staffHistory: [],
   };
+  let dashboardRefreshTimer = 0;
 
   const esc = (value) => String(value ?? "").replace(/[&<>'"]/g, (char) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;",
@@ -88,7 +86,6 @@
         QR_CREDENTIAL_NOT_REPLACEABLE: "That QR has already been replaced or expired.",
         QR_REPLACEMENT_FAILED: "The replacement did not complete, so the old QR was left unchanged.",
         PERSON_TYPE_REQUIRED: "Choose Students or Staff before searching.",
-        REGISTER_LOCKED: "This attendance record is locked. Use the controlled correction workflow.",
         STAFF_INACTIVE: "That staff identity is no longer active in Central Registry.",
         STAFF_EVENT_TIME_REQUIRED: "Enter the actual arrival or closing time for this staff record.",
       };
@@ -102,13 +99,17 @@
   const universalRead = (action, payload = {}) => rpc("attendance_universal_admin_read_api", action, payload);
   const notebookRead = (action, payload = {}) => rpc("attendance_notebook_read_api", action, payload);
   const universalWrite = (action, payload = {}) => rpc("attendance_universal_admin_write_api", action, payload);
-  const notebookWrite = (action, payload = {}) => rpc("attendance_notebook_write_api", action, payload);
   const qrWrite = (action, payload = {}) => rpc("attendance_qr_card_api", action, payload);
-  const controlsWrite = (action, payload = {}) => rpc("attendance_controls_admin_write_api", action, payload);
   const staffRead = (action, payload = {}) => rpc("staff_attendance_admin_read_api", action, payload);
 
   function connected(value, message = "") {
     state.connected = value;
+    if (dashboardRefreshTimer) window.clearInterval(dashboardRefreshTimer);
+    dashboardRefreshTimer = value ? window.setInterval(() => {
+      if (document.visibilityState !== "hidden" && $("#view-overview")?.classList.contains("active")) {
+        loadOverview().catch((error) => console.warn("Dashboard refresh failed", error));
+      }
+    }, 15000) : 0;
     document.body.classList.toggle("locked", !value);
     $("#dot")?.classList.toggle("on", value);
     if ($("#connectionText")) $("#connectionText").textContent = value ? "Live central access" : "Central access required";
@@ -142,7 +143,6 @@
 
   function fillClassSelectors() {
     const options = contextClasses();
-    setOptions("#registerClass", options, "Choose a class");
     setOptions("#reportClass", options, globalScope() ? "All classes" : "Choose class");
     setOptions("#qrBatchClass", options, "Choose a class");
     if (!globalScope() && !$("#reportClass")?.value && options[0]) $("#reportClass").value = options[0].value;
@@ -153,7 +153,6 @@
       credentials: permission("credentials.manage"),
       devices: permission("devices.read") || permission("devices.manage"),
       imports: permission("imports.read") || permission("imports.manage"),
-      corrections: permission("corrections.create") || permission("corrections.review"),
       reports: permission("reports.read"),
       settings: permission("settings.manage") || permission("dashboard.read"),
     };
@@ -161,21 +160,17 @@
       const viewName = button.dataset.view;
       button.hidden = gated[viewName] === false;
     });
-    if ($("#staffManualPanel")) {
-      $("#staffManualPanel").hidden = !(permission("manual_entries.create") || permission("staff.manage") || permission("*"));
-    }
   }
 
   function setTitle(viewName) {
     const titles = {
       overview: ["Dashboard", "Today's attendance in one place."],
-      scan: ["Take Attendance", "Keep the QR scanner ready or open a class register."],
+      scan: ["Take Attendance", "Open the QR scanner for the register being recorded."],
       credentials: ["QR Codes Generation", "Generate and print attendance QR codes for students and staff."],
       devices: ["Authorized QR Devices", "Register the devices allowed to send attendance."],
-      imports: ["Import Centre", "Reconcile QR scanner records saved for later."],
-      corrections: ["Corrections", "Review a controlled attendance change."],
-      reports: ["Analysis", "See student and staff attendance by day, week, month, term, or session."],
-      settings: ["Setup", "Manage QR capture, devices, imports and the official school context."],
+      imports: ["Offline Synchronization", "Import saved QR scanner records with their original scan time."],
+      reports: ["Analysis", "Prepare student and staff attendance reports by period."],
+      settings: ["Setup", "Authorize QR scanners and synchronize saved scanner records."],
     };
     const [title, subtitle] = titles[viewName] || titles.overview;
     $("#title").textContent = title;
@@ -186,16 +181,15 @@
     if (!state.connected) return;
     if ($(`#view-${viewName}`)?.hidden) return;
     $$(".view").forEach((view) => view.classList.toggle("active", view.id === `view-${viewName}`));
-    const parentView = ["devices", "imports", "corrections"].includes(viewName) ? "settings" : viewName;
+    const parentView = ["devices", "imports"].includes(viewName) ? "settings" : viewName;
     $$(".nav").forEach((button) => button.classList.toggle("active", button.dataset.view === parentView));
     setTitle(viewName);
     try {
       if (viewName === "overview") await loadOverview();
-      if (viewName === "scan") { await loadRegister(); await loadStaffManualPeople(); }
+      if (viewName === "scan") return;
       if (viewName === "credentials") await loadCredentialPeople();
       if (viewName === "devices") await loadDevices();
       if (viewName === "imports") await loadImports();
-      if (viewName === "corrections") await loadCorrections();
       if (viewName === "reports") { await runReport(); await loadStaffAnalysis(); }
       if (viewName === "settings") await renderSettings();
     } catch (error) {
@@ -206,12 +200,6 @@
 
   function numberValue(value) {
     return Number.isFinite(Number(value)) ? Number(value) : 0;
-  }
-
-  function renderEvents(target, events = []) {
-    const node = $(target);
-    if (!node) return;
-    node.innerHTML = events.length ? events.slice(0, 8).map((event) => `<div class="event"><div><strong>${esc(event.name || event.full_name || event.student_name || event.staff_name || "Attendance event")}</strong><small>${esc(event.class_key || event.designation || event.category || "")} · ${esc(cleanStatus(event.source || event.event_type || "recorded"))} · ${esc(displayTime(event.event_time || event.scan_time || event.recorded_at))}</small></div><span class="badge ${statusClass(event.attendance_status || event.daily_status || "recorded")}">${esc(cleanStatus(event.attendance_status || event.daily_status || "recorded"))}</span></div>`).join("") : `<div class="empty">No attendance events have been recorded yet.</div>`;
   }
 
   async function loadOverview() {
@@ -229,169 +217,15 @@
     state.summary = summary;
     const student = summary.student || summary;
     const staff = summary.staff || {};
-    const slotLabel = state.dashboardSlot === "afternoon" ? "Afternoon closing" : "Morning arrival";
+    const closing = state.dashboardSlot === "afternoon";
+    const slotLabel = closing ? "Afternoon closing" : "Morning arrival";
     $$("[data-dashboard-slot]").forEach((button) => button.classList.toggle("active", button.dataset.dashboardSlot === state.dashboardSlot));
     $("#todayHeading").textContent = `${slotLabel} attendance`;
-    $("#sExpected").textContent = numberValue(student.expected);
     $("#sPresent").textContent = numberValue(student.present);
-    $("#sLate").textContent = numberValue(student.late);
-    $("#sAbsent").textContent = numberValue(student.absent);
-    $("#sUnconfirmed").textContent = numberValue(student.unconfirmed_classes ?? (student.class_summary || []).filter((item) => numberValue(item.waiting) > 0 || !["confirmed", "closed"].includes(item.register_status)).length);
-    $("#tPresent").textContent = numberValue(staff.present);
+    $("#tPresent").textContent = closing ? numberValue(staff.checked_out) : numberValue(staff.present);
+    $("#studentCounterLabel").textContent = closing ? "Students signed out" : "Students signed in";
+    $("#staffCounterLabel").textContent = closing ? "Staff signed out" : "Staff signed in";
     $("#today").textContent = `${new Date(`${date}T00:00:00`).toLocaleDateString("en-NG", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} · ${slotLabel}`;
-    $("#studentPresenceNote").textContent = state.dashboardSlot === "afternoon" ? "Valid closing scan" : "First valid arrival scan";
-    $("#staffPresenceNote").textContent = state.dashboardSlot === "afternoon" ? "Staff closing records" : "Staff arrival records";
-  }
-
-  const registerStatuses = [
-    ["present", "Present"],
-    ["late", "Late"],
-    ["absent", "Absent"],
-    ["excused", "Excused"],
-    ["official_activity", "Official activity"],
-    ["sick_leave", "Sick leave"],
-    ["not_expected", "Not expected"],
-    ["incomplete", "Incomplete"],
-  ];
-
-  function registerStatusLabel(value) {
-    return registerStatuses.find(([status]) => status === value)?.[1] || cleanStatus(value || "Incomplete");
-  }
-
-  function registerLocked() {
-    return ["confirmed", "closed", "archived"].includes(String(state.register.lock?.status || "").toLowerCase());
-  }
-
-  function renderRegister() {
-    const rows = state.register.rows || [];
-    const locked = registerLocked();
-    const lockStatus = String(state.register.lock?.status || "open").toLowerCase();
-    const incomplete = rows.filter((row) => !row.status || row.status === "incomplete").length;
-    const label = state.register.slot === "afternoon" ? "Afternoon closing" : "Morning arrival";
-    const lockLabel = ["confirmed", "closed", "archived"].includes(lockStatus) ? cleanStatus(lockStatus) : incomplete ? `${incomplete} incomplete` : "Open";
-    const stateNode = $("#registerState");
-    if (stateNode) {
-      stateNode.textContent = lockLabel;
-      stateNode.className = `pill ${statusClass(lockStatus === "open" && incomplete ? "pending" : lockStatus)}`;
-    }
-    if ($("#registerHeading")) $("#registerHeading").textContent = `${state.register.classKey || "Class"} · ${label}`;
-    if ($("#registerSubheading")) $("#registerSubheading").textContent = `${displayDate(state.register.date)} · ${rows.length} pupil record(s) · ${state.context?.session || "Current session"} · ${state.context?.term || "Current term"}`;
-    ["#markAllPresent", "#saveRegister", "#confirmRegister", "#printRegister"].forEach((selector) => {
-      if ($(selector)) $(selector).disabled = !rows.length || locked;
-    });
-    if (!$("#registerList")) return;
-    $("#registerList").innerHTML = rows.length ? rows.map((row, index) => {
-      const current = row.status || "incomplete";
-      return `<div class="register-row ${current === "incomplete" ? "needs-entry" : ""}"><span class="register-number" aria-hidden="true">${String(index + 1).padStart(2, "0")}</span><span class="person-copy"><strong>${esc(row.name || "Unnamed pupil")}</strong><small>${esc(row.admno || "No admission number")}${row.gender ? ` · ${esc(row.gender)}` : ""}</small></span><label class="register-status-control"><span class="sr-only">Attendance status for ${esc(row.name || "pupil")}</span><select class="status-select" data-register-status="${index}" ${locked ? "disabled" : ""}>${registerStatuses.map(([value, name]) => `<option value="${value}" ${value === current ? "selected" : ""}>${esc(name)}</option>`).join("")}</select></label><input class="register-note-input" data-register-note="${index}" value="${esc(row.note || "")}" placeholder="Note" aria-label="Note for ${esc(row.name || "pupil")}" ${locked ? "disabled" : ""}><span class="row-check" aria-hidden="true">${current === "incomplete" ? "–" : "✓"}</span></div>`;
-    }).join("") : `<div class="empty">Open a class register to begin. The active Central Registry roster will appear here.</div>`;
-  }
-
-  async function loadRegister() {
-    const date = $("#registerDate")?.value || todayIso();
-    const slot = $("#registerSlot")?.value || "morning";
-    const classKey = $("#registerClass")?.value || "";
-    if (!classKey) {
-      state.register = { date, slot, classKey: "", rows: [], lock: {} };
-      renderRegister();
-      return;
-    }
-    const data = await universalRead("register", { date, sessionSlot: slot, classKey });
-    state.register = { date, slot, classKey, rows: data.students || [], lock: data.lock || {} };
-    renderRegister();
-  }
-
-  function registerRowsFromDom() {
-    return (state.register.rows || []).map((row, index) => ({
-      studentId: row.id,
-      status: $("[data-register-status=\"" + index + "\"]")?.value || row.status || "incomplete",
-      note: $("[data-register-note=\"" + index + "\"]")?.value.trim() || null,
-    }));
-  }
-
-  async function saveManualRegister({ silent = false } = {}) {
-    if (!state.register.classKey || !state.register.rows.length) return toast("Open a class register first.", "warning");
-    if (registerLocked()) return toast("This register is locked. Use the controlled correction workflow.", "warning");
-    const rows = registerRowsFromDom();
-    await universalWrite("saveRegister", { date: state.register.date, sessionSlot: state.register.slot, classKey: state.register.classKey, rows });
-    if (!silent) toast("Register saved. Confirm it after every row is complete.", "success");
-    await loadRegister();
-    await loadOverview();
-  }
-
-  async function confirmManualRegister() {
-    if (!state.register.classKey || !state.register.rows.length) return toast("Open a class register first.", "warning");
-    if (registerLocked()) return toast("This register is already locked.", "warning");
-    const rows = registerRowsFromDom();
-    if (rows.some((row) => row.status === "incomplete")) return toast("Complete every pupil row before confirming the register.", "error");
-    await universalWrite("saveRegister", { date: state.register.date, sessionSlot: state.register.slot, classKey: state.register.classKey, rows });
-    await universalWrite("confirmRegister", { date: state.register.date, sessionSlot: state.register.slot, classKey: state.register.classKey });
-    toast("Register confirmed and locked.", "success");
-    await loadRegister();
-    await loadOverview();
-  }
-
-  function markAllRegisterPresent() {
-    if (registerLocked()) return toast("This register is locked.", "warning");
-    $$('[data-register-status]').forEach((select) => { select.value = "present"; });
-    toast("All rows are marked present. Save or confirm to record the change.", "success");
-  }
-
-  const canRecordStaffManually = () => permission("manual_entries.create") || permission("staff.manage") || permission("*");
-
-  function localClock() {
-    return new Intl.DateTimeFormat("en-GB", {
-      timeZone: "Africa/Lagos",
-      hour: "2-digit",
-      minute: "2-digit",
-      hourCycle: "h23",
-    }).format(new Date());
-  }
-
-  async function loadStaffManualPeople() {
-    if (!canRecordStaffManually()) return;
-    let data;
-    try {
-      data = await staffRead("staff");
-    } catch (error) {
-      if (error.code !== "ADMIN_PERMISSION_DENIED") throw error;
-      const fallback = await universalRead("people", { personType: "staff" });
-      data = { staff: fallback.people || [] };
-    }
-    state.staffPeople = data.staff || [];
-    setOptions("#staffManualPerson", state.staffPeople.map((person) => ({
-      value: person.id,
-      label: `${person.full_name || person.display_name || "Staff"}${person.staff_number ? ` · ${person.staff_number}` : ""}`,
-    })), "Choose a staff member");
-  }
-
-  async function saveManualStaff(event) {
-    event?.preventDefault();
-    if (!canRecordStaffManually()) return toast("Manual staff attendance is restricted to authorized Attendance officers.", "error");
-    const staffId = $("#staffManualPerson")?.value;
-    const attendanceDate = $("#staffManualDate")?.value || todayIso();
-    const sessionSlot = $("#staffManualSlot")?.value || "morning";
-    const eventType = $("#staffManualEventType")?.value || "check_in";
-    const eventClock = $("#staffManualTime")?.value || "";
-    const status = $("#staffManualStatus")?.value || "auto";
-    const note = $("#staffManualNote")?.value.trim() || null;
-    const noTimeStatuses = new Set(["absent", "leave", "official_assignment", "sick_leave", "half_day", "excused", "not_expected", "school_closed"]);
-    if (!staffId) return toast("Choose a real staff member first.", "warning");
-    if (!eventClock && (status === "auto" || !noTimeStatuses.has(status))) return toast("Enter the actual arrival or closing time.", "warning");
-    const result = await notebookWrite("manualStaffAttendance", {
-      staffId,
-      attendanceDate,
-      sessionSlot,
-      eventType,
-      eventClock: eventClock || null,
-      status,
-      note,
-    });
-    const personName = result.staff?.name || "Staff record";
-    toast(`${personName} recorded: ${cleanStatus(result.attendance?.status || status)}.`, "success");
-    $("#staffManualNote").value = "";
-    $("#staffManualStatus").value = "auto";
-    $("#staffManualTime").value = localClock();
-    await Promise.all([loadStaffLogbook(), loadOverview()]);
   }
 
   async function loadStaffLogbook() {
@@ -408,7 +242,7 @@
     $("#staffLogbookRows").innerHTML = rows.length ? rows.map((row, index) => {
       const hasDeparture = Boolean(row.departure);
       const status = row.status || "incomplete";
-      return `<tr><td>${index + 1}</td><td><strong>${esc(row.full_name || "Unnamed staff")}</strong>${row.department ? `<small>${esc(row.department)}</small>` : ""}</td><td>${esc(row.staff_number || "—")}</td><td>${esc(row.designation || "—")}</td><td>${esc(displayTime(row.arrival))}</td><td><span class="badge ${statusClass(status)}">${esc(cleanStatus(status))}</span></td><td>${esc(displayTime(row.departure))}</td><td><span class="badge ${hasDeparture ? "recorded" : "incomplete"}">${hasDeparture ? "Recorded" : "Not yet recorded"}</span></td><td>${esc(row.method || "QR / manual")}</td></tr>`;
+      return `<tr><td>${index + 1}</td><td><strong>${esc(row.full_name || "Unnamed staff")}</strong>${row.department ? `<small>${esc(row.department)}</small>` : ""}</td><td>${esc(row.staff_number || "—")}</td><td>${esc(row.designation || "—")}</td><td>${esc(displayTime(row.arrival))}</td><td><span class="badge ${statusClass(status)}">${esc(cleanStatus(status))}</span></td><td>${esc(displayTime(row.departure))}</td><td><span class="badge ${hasDeparture ? "recorded" : "incomplete"}">${hasDeparture ? "Recorded" : "Not yet recorded"}</span></td><td>${esc(row.method || "QR")}</td></tr>`;
     }).join("") : `<tr><td colspan="9" class="empty">No staff attendance has been recorded for this date.</td></tr>`;
     return rows;
   }
@@ -464,8 +298,13 @@
   }
 
   async function loadCredentialPeople() {
-    const type = $("#credentialPersonType").value;
-    const search = $("#credentialSearch").value.trim();
+    const type = $("#credentialPersonType")?.value || "student";
+    const search = $("#credentialSearch")?.value.trim() || "";
+    if (!search) {
+      if (type === "student") state.students = []; else state.staff = [];
+      $("#credentialPeople").innerHTML = '<div class="empty">Search by name or school number to choose one person.</div>';
+      return;
+    }
     const data = await universalRead("people", { personType: type, search });
     const people = (data.people || []).map((person) => normalizeCredentialPerson(person, type));
     if (type === "student") state.students = people; else state.staff = people;
@@ -490,7 +329,6 @@
     $("#credentialAvatar").innerHTML = avatarMarkup(state.selectedPerson);
     const data = await universalRead("credentials", { personType: type, personId: id });
     renderCredentialList(data.credentials || []);
-    if (permission("devices.read") || permission("devices.manage") || globalScope()) await loadDevices();
   }
 
   function renderCredentialList(credentials) {
@@ -569,9 +407,8 @@
 
   async function prepareQrBatch(type, classKey = "") {
     if (state.qrBatchBusy) return toast("A QR set is already being prepared.", "warning");
-    if (type === "student" && !classKey) return toast("Choose a student class first.", "error");
     state.qrBatchBusy = true;
-    const label = type === "student" ? classKey + " student" : "all staff";
+    const label = type === "student" ? (classKey ? classKey + " student" : "all student") : "all staff";
     try {
       setQrBatchStatus("Loading " + label + " records…");
       const data = await universalRead("people", { personType: type, search: classKey || "" });
@@ -600,7 +437,7 @@
         setQrBatchStatus("No QR codes are ready. Used credentials with a missing value need a loss/damage replacement.", "error");
         return toast("No printable QR codes were returned for this set.", "error");
       }
-      await showQrPreview((type === "student" ? "Class " + classKey : "All staff") + " attendance QR codes ready", codes);
+      await showQrPreview((type === "student" ? (classKey ? "Class " + classKey : "All students") : "All staff") + " attendance QR codes ready", codes);
       const suffix = skipped.length ? " " + skipped.length + " QR code(s) need review because their credential was already used." : "";
       setQrBatchStatus(codes.length + " QR code(s) ready for print." + suffix, skipped.length ? "warning" : "success");
       toast(codes.length + " attendance QR code(s) are ready. Download the PNG or print the complete QR sheet.", "success");
@@ -721,7 +558,7 @@
     const counts = rows.reduce((acc, row) => { acc[row.validation_status || "pending"] = (acc[row.validation_status || "pending"] || 0) + 1; return acc; }, {});
     $("#importPreview").hidden = !rows.length;
     $("#importSummary").innerHTML = [["Ready", counts.ready || 0, "ready"], ["Unknown identity", counts.unknown_identity || 0, "unknown_identity"], ["Duplicate", counts.duplicate || 0, "duplicate"], ["Invalid", (counts.invalid_date_time || 0) + (counts.invalid_credential || 0), "invalid"]].map(([label, count, kind]) => `<span class="import-count ${kind}"><b>${count}</b><small>${label}</small></span>`).join("");
-    $("#importRows").innerHTML = rows.map((row) => `<tr class="${state.import.selectedRowId === row.id ? "selected-row" : ""}" data-import-row="${esc(row.id || row.row_number)}"><td>${esc(row.row_number || row.rowNumber)}</td><td><strong>${esc(row.raw_identifier || row.rawIdentifier || "—")}</strong><small>${esc(row.external_user_id || "")}</small></td><td>${esc(displayTime(row.event_time || row.eventTime))}</td><td>${esc(cleanStatus(row.credential_method || row.credentialMethod || "—"))}</td><td><span class="badge ${statusClass(row.validation_status || "pending")}">${esc(cleanStatus(row.validation_status || "pending"))}</span></td><td>${esc(row.validation_reason || "")}</td></tr>`).join("");
+    $("#importRows").innerHTML = rows.map((row) => `<tr><td>${esc(row.row_number || row.rowNumber)}</td><td><strong>${esc(row.raw_identifier || row.rawIdentifier || "—")}</strong><small>${esc(row.external_user_id || "")}</small></td><td>${esc(displayTime(row.event_time || row.eventTime))}</td><td>${esc(cleanStatus(row.credential_method || row.credentialMethod || "—"))}</td><td><span class="badge ${statusClass(row.validation_status || "pending")}">${esc(cleanStatus(row.validation_status || "pending"))}</span></td><td>${esc(row.validation_reason || "")}</td></tr>`).join("");
   }
 
   async function previewImport() {
@@ -744,38 +581,8 @@
     $("#importFileStatus").textContent = `${file.name} · ${state.import.rows.length} row(s) previewed.`;
     $("#importPreviewTitle").textContent = `${file.name} · preview`;
     renderImportPreview();
-    toast("Import preview ready. Review unknown and invalid rows before confirming.", "success");
+    toast("Import preview ready. Only rows resolved to an existing QR identity will be accepted.", "success");
     await loadImports();
-  }
-
-  async function loadMapPeople() {
-    const personType = $("#mapPersonType").value;
-    const search = $("#mapPersonSearch").value.trim();
-    const data = await universalRead("people", { personType, search });
-    state.mapPeople = data.people || [];
-    $("#mapPersonResults").innerHTML = state.mapPeople.length ? state.mapPeople.map((person) => `<button type="button" class="person-item" data-map-person-id="${esc(person.id)}"><span class="avatar small-avatar">${avatarMarkup(person, "P")}</span><span><b>${esc(person.display_name)}</b><small>${esc(person.group_name || "")}${person.reference ? ` · ${esc(person.reference)}` : ""}</small></span><span>Choose</span></button>`).join("") : `<div class="empty">No matching ${personType === "student" ? "students" : "staff"} found.</div>`;
-  }
-
-  async function openMapImportRow() {
-    const row = state.import.rows.find((item) => String(item.id) === String(state.import.selectedRowId));
-    if (!row || row.validation_status !== "unknown_identity") return toast("Choose a row marked Unknown person first.", "error");
-    $("#mapRowIdentifier").textContent = row.raw_identifier || row.external_user_id || "Unknown QR";
-    $("#mapPersonType").value = "student";
-    $("#mapPersonSearch").value = "";
-    $("#mapPersonDialog").showModal();
-    await loadMapPeople();
-  }
-
-  async function mapSelectedImportRow(personId) {
-    const row = state.import.rows.find((item) => String(item.id) === String(state.import.selectedRowId));
-    const personType = $("#mapPersonType").value;
-    if (!row) return;
-    await universalWrite("mapImportRow", { rowId: row.id, [personType === "student" ? "studentId" : "staffId"]: personId, credentialType: "external_device_user_id", rawIdentifier: row.raw_identifier, externalUserId: row.external_user_id, deviceId: $("#importDevice").value || null });
-    const refreshed = await universalRead("import_rows", { batchId: state.import.batchId });
-    state.import.rows = refreshed.rows || [];
-    renderImportPreview();
-    $("#mapPersonDialog").close();
-    toast("The unknown QR is now matched to that person.", "success");
   }
 
   async function confirmImport() {
@@ -792,26 +599,6 @@
     const data = await universalRead("imports");
     const batches = data.batches || [];
     $("#importBatches").innerHTML = batches.length ? batches.map((batch) => `<div class="batch-row"><div><b>${esc(batch.file_name || "Unnamed import")}</b><small>${esc(batch.adapter_code || "generic")}${batch.uploaded_at ? ` · ${esc(displayDate(batch.uploaded_at))}` : ""}</small></div><div class="batch-numbers"><span>${numberValue(batch.accepted_count)} accepted</span><span>${numberValue(batch.unresolved_count)} unresolved</span><span class="badge ${statusClass(batch.status)}">${esc(cleanStatus(batch.status))}</span></div></div>`).join("") : `<div class="empty">No import batches have been uploaded.</div>`;
-  }
-
-  async function loadCorrections() {
-    const data = await universalRead("corrections");
-    const register = data.register_corrections || [];
-    const daily = data.daily_corrections || [];
-    const actions = (row, type) => `<div class="review-actions"><button class="mini-button approve" data-review="approve" data-review-type="${type}" data-review-id="${esc(row.id)}">Approve</button><button class="mini-button reject" data-review="reject" data-review-type="${type}" data-review-id="${esc(row.id)}">Reject</button></div>`;
-    $("#registerCorrections").innerHTML = register.length ? register.map((row) => `<div class="review-row"><div><b>${esc(cleanStatus(row.requested_status))}</b><small>${esc(row.reason || "No reason")}</small></div>${actions(row, "register")}</div>`).join("") : `<div class="empty">No pending AM / PM corrections.</div>`;
-    $("#dailyCorrections").innerHTML = daily.length ? daily.map((row) => `<div class="review-row"><div><b>${esc(cleanStatus(row.requested_status || "daily correction"))}</b><small>${esc(row.reason || "No reason")}</small></div>${actions(row, "daily")}</div>`).join("") : `<div class="empty">No pending daily corrections.</div>`;
-  }
-
-  async function reviewCorrection(event) {
-    const button = event.target.closest("[data-review]");
-    if (!button) return;
-    const approve = button.dataset.review === "approve";
-    const type = button.dataset.reviewType;
-    if (type === "register") await universalWrite(`${approve ? "approve" : "reject"}RegisterCorrection`, { correctionId: button.dataset.reviewId, reviewNote: window.prompt("Review note (optional):", "") || null });
-    else await controlsWrite(`${approve ? "approve" : "reject"}Correction`, { correctionId: button.dataset.reviewId, reviewNote: window.prompt("Review note (optional):", "") || null });
-    toast(approve ? "Correction approved and audited." : "Correction rejected and audited.", "success");
-    await loadCorrections();
   }
 
   async function runReport() {
@@ -839,45 +626,16 @@
   }
 
   async function renderSettings() {
-    const config = state.context?.config || {};
-    $("#contextDetails").innerHTML = `<div><dt>School session</dt><dd>${esc(state.context?.session || config.operational_session || "—")}</dd></div><div><dt>Term</dt><dd>${esc(state.context?.term || config.operational_term || "—")}</dd></div><div><dt>People and classes</dt><dd>Come from the main school records</dd></div><div><dt>Attendance method</dt><dd>QR-first capture with live or offline synchronization</dd></div><div><dt>Not yet scanned</dt><dd>Calculated from the expected class list and recorded QR scans</dd></div>`;
-    const permissions = state.context?.permissions || [];
-    const accessLabels = {
-      "*": "All Attendance areas",
-      "dashboard.read": "See today's attendance",
-      "class.attendance.read": "See class attendance",
-      "class.attendance.write": "Work with class attendance",
-      "attendance.register.confirm": "Confirm class attendance",
-      "staff.read": "See staff attendance",
-      "reports.read": "View reports",
-      "credentials.manage": "Generate attendance QR codes",
-      "devices.read": "See school devices",
-      "devices.manage": "Set up school devices",
-      "imports.read": "See uploaded records",
-      "imports.manage": "Bring in device records",
-      "corrections.create": "Ask for a record correction",
-      "corrections.review": "Approve record corrections",
-      "settings.manage": "Manage Attendance setup",
-    };
-    const friendlyAccess = [...new Set(permissions.map((item) => accessLabels[item]).filter(Boolean))];
-    $("#roleDetails").innerHTML = friendlyAccess.length ? friendlyAccess.map((item) => `<span class="permission-chip">${esc(item)}</span>`).join("") : `<div class="empty">No Attendance areas are assigned to this account.</div>`;
-    await loadRosterSyncStatus();
-  }
-
-  async function loadRosterSyncStatus() {
-    const data = await rpc("attendance_roster_sync_status_api");
-    state.rosterSync = data;
-    const latest = data.latest_success && data.latest_success !== "null" ? data.latest_success : null;
-    const completed = latest?.completed_at ? displayDate(latest.completed_at) : "Not available";
-    $("#rosterSyncDetails").innerHTML = latest ? `<div><dt>Last successful sync</dt><dd>${esc(completed)}</dd></div><div><dt>Context</dt><dd>${esc(`${latest.academic_session || "—"} · ${latest.academic_term || "—"}`)}</dd></div><div><dt>Records added / updated</dt><dd>${numberValue(latest.records_added)} / ${numberValue(latest.records_updated)}</dd></div><div><dt>Deactivated for future rosters</dt><dd>${numberValue(latest.records_deactivated)}</dd></div><div><dt>Unresolved identities</dt><dd>${numberValue(latest.unresolved_identities)}</dd></div><div><dt>Failed mappings</dt><dd>${numberValue(latest.failed_mappings)}</dd></div>` : `<div class="empty">No successful roster synchronisation is recorded yet.</div>`;
-    $("#retryRosterSync").disabled = !(data.retry_available && globalScope());
-  }
-
-  async function retryRosterSync() {
-    if (!globalScope()) return toast("Roster synchronisation requires an authorised Attendance administrator.", "error");
-    await rpc("attendance_roster_sync_api", "", { academic_session: state.context?.session, academic_term: state.context?.term, as_of_date: todayIso() });
-    await loadRosterSyncStatus();
-    toast("Central Registry roster re-synchronised safely.", "success");
+    const canSeeDevices = permission("devices.read") || permission("devices.manage") || globalScope();
+    const canSeeImports = permission("imports.read") || permission("imports.manage") || globalScope();
+    const [devices, imports] = await Promise.all([
+      canSeeDevices ? universalRead("devices") : Promise.resolve({ devices: [] }),
+      canSeeImports ? universalRead("imports") : Promise.resolve({ batches: [] }),
+    ]);
+    const deviceCount = (devices.devices || []).length;
+    const importCount = (imports.batches || []).length;
+    if ($("#setupDeviceSummary")) $("#setupDeviceSummary").textContent = canSeeDevices ? `${deviceCount} authorized device${deviceCount === 1 ? "" : "s"} · Open setup →` : "Device setup is restricted";
+    if ($("#setupImportSummary")) $("#setupImportSummary").textContent = canSeeImports ? `${importCount} saved import${importCount === 1 ? "" : "s"} · Open sync →` : "Offline sync is restricted";
   }
 
   function renderQrBlock(code, index, { inlineQr = false } = {}) {
@@ -1055,20 +813,12 @@
     window.setTimeout(() => printWindow.print(), 180);
   }
 
-  function printRegisterSheet() {
-    if (!state.register.classKey || !state.register.rows.length) return toast("Open a class register before printing.", "warning");
-    const rows = registerRowsFromDom();
-    const label = state.register.slot === "afternoon" ? "Afternoon closing" : "Morning arrival";
-    const markup = `<header class="print-heading"><small>WAY TO SUCCESS STANDARD SCHOOLS, EJIGBO</small><h1>Student attendance register</h1><p>${esc(state.register.classKey)} · ${esc(label)} · ${esc(displayDate(state.register.date))}</p><p>${esc(state.context?.session || "Current session")} · ${esc(state.context?.term || "Current term")}</p></header><table class="print-table"><thead><tr><th>S/N</th><th>Pupil name</th><th>Admission number</th><th>Status</th><th>Note</th></tr></thead><tbody>${state.register.rows.map((row, index) => `<tr><td>${index + 1}</td><td>${esc(row.name || "Unnamed pupil")}</td><td>${esc(row.admno || "—")}</td><td>${esc(registerStatusLabel(rows[index]?.status || row.status || "incomplete"))}</td><td>${esc(rows[index]?.note || row.note || "")}</td></tr>`).join("")}</tbody></table><footer class="print-signatures"><span>Class teacher: __________________________</span><span>Signature: __________________________</span><span>Administrator / principal: __________________________</span></footer>`;
-    openPrintWindow("WTS student attendance register", markup);
-  }
-
   async function printStaffLogbook() {
     if (!state.staffLogbook.length) {
       try { await loadStaffLogbook(); } catch { return; }
     }
     const date = $("#staffLogbookDate")?.value || todayIso();
-    const markup = `<header class="print-heading"><small>WAY TO SUCCESS STANDARD SCHOOLS, EJIGBO</small><h1>Daily staff attendance register</h1><p>${esc(displayDate(date))} · ${esc(state.context?.session || "Current session")} · ${esc(state.context?.term || "Current term")}</p></header><table class="print-table"><thead><tr><th>S/N</th><th>Staff name</th><th>Staff number</th><th>Position</th><th>Morning arrival</th><th>Arrival status</th><th>Afternoon closing</th><th>Closing status</th><th>Method</th></tr></thead><tbody>${state.staffLogbook.map((row, index) => `<tr><td>${index + 1}</td><td>${esc(row.full_name || "Unnamed staff")}</td><td>${esc(row.staff_number || "—")}</td><td>${esc(row.designation || "—")}</td><td>${esc(displayTime(row.arrival))}</td><td>${esc(cleanStatus(row.status || "incomplete"))}</td><td>${esc(displayTime(row.departure))}</td><td>${row.departure ? "Recorded" : "Not yet recorded"}</td><td>${esc(row.method || "QR / manual")}</td></tr>`).join("")}</tbody></table><footer class="print-signatures"><span>Staff signatures: __________________________</span><span>Class teacher / supervisor: __________________________</span><span>Administrator / principal: __________________________</span></footer>`;
+    const markup = `<header class="print-heading"><small>WAY TO SUCCESS STANDARD SCHOOLS, EJIGBO</small><h1>Daily staff attendance register</h1><p>${esc(displayDate(date))} · ${esc(state.context?.session || "Current session")} · ${esc(state.context?.term || "Current term")}</p></header><table class="print-table"><thead><tr><th>S/N</th><th>Staff name</th><th>Staff number</th><th>Position</th><th>Morning arrival</th><th>Arrival status</th><th>Afternoon closing</th><th>Closing status</th><th>Method</th></tr></thead><tbody>${state.staffLogbook.map((row, index) => `<tr><td>${index + 1}</td><td>${esc(row.full_name || "Unnamed staff")}</td><td>${esc(row.staff_number || "—")}</td><td>${esc(row.designation || "—")}</td><td>${esc(displayTime(row.arrival))}</td><td>${esc(cleanStatus(row.status || "incomplete"))}</td><td>${esc(displayTime(row.departure))}</td><td>${row.departure ? "Recorded" : "Not yet recorded"}</td><td>${esc(row.method || "QR")}</td></tr>`).join("")}</tbody></table><footer class="print-signatures"><span>Staff signatures: __________________________</span><span>Class teacher / supervisor: __________________________</span><span>Administrator / principal: __________________________</span></footer>`;
     openPrintWindow("WTS daily staff attendance register", markup);
   }
 
@@ -1081,6 +831,10 @@
   }
 
   function wireEvents() {
+    const bind = (selector, event, handler) => {
+      const node = $(selector);
+      if (node) node[event] = handler;
+    };
     $$(".nav").forEach((button) => button.addEventListener("click", () => openView(button.dataset.view)));
     $$(".analysis-tab").forEach((button) => button.addEventListener("click", () => {
       const panelName = button.dataset.analysis;
@@ -1090,6 +844,12 @@
         tab.setAttribute("aria-selected", String(active));
       });
       $$(".analysis-panel").forEach((panel) => panel.classList.toggle("active", panel.id === `analysis-${panelName}`));
+    }));
+    $$(".analysis-mode").forEach((button) => button.addEventListener("click", () => {
+      const mode = button.dataset.staffMode;
+      $$(".analysis-mode").forEach((item) => item.classList.toggle("active", item === button));
+      if ($("#staffGeneralView")) $("#staffGeneralView").hidden = mode !== "general";
+      if ($("#staffIndividualView")) $("#staffIndividualView").hidden = mode !== "individual";
     }));
     document.addEventListener("click", (event) => {
       const go = event.target.closest("[data-go]");
@@ -1104,81 +864,44 @@
       if (blockCredentialButton) { blockCredential(blockCredentialButton.dataset.blockCredential).catch((error) => toast(error.message, "error")); return; }
       const person = event.target.closest("[data-person-id]");
       if (person) { selectCredentialPerson(person.dataset.personId).catch((error) => toast(error.message, "error")); return; }
-      const mapPerson = event.target.closest("[data-map-person-id]");
-      if (mapPerson) { mapSelectedImportRow(mapPerson.dataset.mapPersonId).catch((error) => toast(error.message, "error")); return; }
       const credential = event.target.closest("[data-suspend-credential]");
       if (credential) { blockCredential(credential.dataset.suspendCredential).catch((error) => toast(error.message, "error")); return; }
-      if (event.target.closest("[data-review]")) { reviewCorrection(event).catch((error) => toast(error.message, "error")); return; }
-      const importRow = event.target.closest("[data-import-row]");
-      if (importRow) { state.import.selectedRowId = importRow.dataset.importRow; renderImportPreview(); }
     });
-    document.addEventListener("change", (event) => {
-      const status = event.target.closest("[data-register-status]");
-      if (status) {
-        const row = state.register.rows[Number(status.dataset.registerStatus)];
-        if (row) row.status = status.value;
-        const check = status.closest(".register-row")?.querySelector(".row-check");
-        if (check) check.textContent = status.value === "incomplete" ? "–" : "✓";
-      }
-    });
-    $("#refresh").onclick = () => loadContext().catch((error) => toast(error.message, "error"));
-    $("#login").onclick = signOut;
-    $("#refreshScanEvents").onclick = () => loadOverview().then(() => renderEvents("#scanEvents", [...(state.summary?.student?.latest_events || state.summary?.latest_events || []), ...(state.summary?.staff?.latest_events || [])])).catch((error) => toast(error.message, "error"));
-    $("#registerDate").value = todayIso();
-    $("#registerDate").onchange = () => loadRegister().catch((error) => toast(error.message, "error"));
-    $("#registerSlot").onchange = () => loadRegister().catch((error) => toast(error.message, "error"));
-    $("#registerClass").onchange = () => loadRegister().catch((error) => toast(error.message, "error"));
-    $("#loadRegister").onclick = () => loadRegister().catch((error) => toast(error.message, "error"));
-    $("#markAllPresent").onclick = markAllRegisterPresent;
-    $("#saveRegister").onclick = () => saveManualRegister().catch((error) => toast(error.message, "error"));
-    $("#confirmRegister").onclick = () => confirmManualRegister().catch((error) => toast(error.message, "error"));
-    $("#printRegister").onclick = printRegisterSheet;
-    $("#staffManualForm").onsubmit = (event) => saveManualStaff(event).catch((error) => toast(error.message, "error"));
-    $("#staffManualEventType").onchange = () => {
-      const checkOut = $("#staffManualEventType").value === "check_out";
-      $("#staffManualSlot").value = checkOut ? "afternoon" : "morning";
-    };
-    $("#credentialPersonType").onchange = () => { state.selectedPerson = null; $("#credentialDetail").hidden = true; $("#credentialEmpty").hidden = false; loadCredentialPeople().catch((error) => toast(error.message, "error")); };
-    $("#searchCredentials").onclick = () => loadCredentialPeople().catch((error) => toast(error.message, "error"));
-    $("#credentialSearch").onkeydown = (event) => { if (event.key === "Enter") loadCredentialPeople().catch((error) => toast(error.message, "error")); };
-    $("#issueQr").onclick = () => issueQr().catch((error) => toast(error.message, "error"));
-    $("#downloadClassQr").onclick = () => prepareQrBatch("student", $("#qrBatchClass").value).catch((error) => toast(error.message, "error"));
-    $("#downloadStaffQr").onclick = () => prepareQrBatch("staff").catch((error) => toast(error.message, "error"));
-    $("#showQrAgain").onclick = () => issueQr().catch((error) => toast(error.message, "error"));
-    $("#addDevice").onclick = openDeviceSetup;
-    $("#deviceForm").onsubmit = (event) => addDevice(event).catch((error) => toast(error.message, "error"));
-    $("#cancelDevice").onclick = () => $("#deviceDialog").close();
-    $("#closeDeviceReady").onclick = () => $("#deviceReadyDialog").close();
-    $("#copyDeviceLogin").onclick = () => navigator.clipboard?.writeText(`Device code: ${$("#readyDeviceCode").textContent}\nDevice secret: ${$("#readyDeviceSecret").textContent}`).then(() => toast("Device code and secret copied.", "success"));
-    $("#importFile").onchange = () => { const file = $("#importFile").files?.[0]; $("#importFileStatus").textContent = file ? `${file.name} selected. Preview before processing.` : "No file selected."; };
-    $("#previewImport").onclick = () => previewImport().catch((error) => toast(error.message, "error"));
-    $("#mapImportRow").onclick = () => openMapImportRow().catch((error) => toast(error.message, "error"));
-    $("#mapPersonSearchButton").onclick = () => loadMapPeople().catch((error) => toast(error.message, "error"));
-    $("#mapPersonType").onchange = () => loadMapPeople().catch((error) => toast(error.message, "error"));
-    $("#mapPersonSearch").onkeydown = (event) => { if (event.key === "Enter") { event.preventDefault(); loadMapPeople().catch((error) => toast(error.message, "error")); } };
-    $("#closeMapPerson").onclick = () => $("#mapPersonDialog").close();
-    $("#confirmImport").onclick = () => confirmImport().catch((error) => toast(error.message, "error"));
-    $("#refreshImports").onclick = () => loadImports().catch((error) => toast(error.message, "error"));
-    $("#refreshCorrections").onclick = () => loadCorrections().catch((error) => toast(error.message, "error"));
-    $("#runReport").onclick = () => runReport().catch((error) => toast(error.message, "error"));
-    $("#loadStaffAnalysis").onclick = () => loadStaffAnalysis().catch((error) => toast(error.message, "error"));
-    $("#loadStaffHistory").onclick = () => loadStaffHistory().catch((error) => toast(error.message, "error"));
-    $("#refreshStaffLogbook").onclick = () => loadStaffAnalysis().catch((error) => toast(error.message, "error"));
-    $("#retryRosterSync").onclick = () => retryRosterSync().catch((error) => toast(error.message, "error"));
-    $("#printReport").onclick = () => printArea("print-report");
-    $("#printStaffLogbook").onclick = () => printStaffLogbook().catch((error) => toast(error.message, "error"));
-    $("#closeQr").onclick = () => $("#qrDialog").close();
-    $("#closeQrButton").onclick = () => $("#qrDialog").close();
-    $("#downloadQrPng").onclick = downloadQrPng;
-    $("#printQrDialog").onclick = () => printQrBatch().catch((error) => toast(error.message, "error"));
-    $("#printQrBackCovers").onclick = () => printQrBackCovers().catch((error) => toast(error.message, "error"));
-    $("#reportFrom").value = monthStart();
-    $("#reportTo").value = todayIso();
-    $("#staffManualDate").value = todayIso();
-    $("#staffManualTime").value = localClock();
-    $("#staffLogbookDate").value = todayIso();
-    $("#staffHistoryFrom").value = monthStart();
-    $("#staffHistoryTo").value = todayIso();
+    bind("#refresh", "onclick", () => loadContext().catch((error) => toast(error.message, "error")));
+    bind("#login", "onclick", signOut);
+    bind("#credentialPersonType", "onchange", () => { state.selectedPerson = null; $("#credentialDetail").hidden = true; $("#credentialEmpty").hidden = false; loadCredentialPeople().catch((error) => toast(error.message, "error")); });
+    bind("#searchCredentials", "onclick", () => loadCredentialPeople().catch((error) => toast(error.message, "error")));
+    bind("#credentialSearch", "onkeydown", (event) => { if (event.key === "Enter") loadCredentialPeople().catch((error) => toast(error.message, "error")); });
+    bind("#issueQr", "onclick", () => issueQr().catch((error) => toast(error.message, "error")));
+    bind("#downloadClassQr", "onclick", () => prepareQrBatch("student", $("#qrBatchClass").value).catch((error) => toast(error.message, "error")));
+    bind("#downloadAllStudentQr", "onclick", () => prepareQrBatch("student").catch((error) => toast(error.message, "error")));
+    bind("#downloadStaffQr", "onclick", () => prepareQrBatch("staff").catch((error) => toast(error.message, "error")));
+    bind("#showQrAgain", "onclick", () => issueQr().catch((error) => toast(error.message, "error")));
+    bind("#addDevice", "onclick", openDeviceSetup);
+    bind("#deviceForm", "onsubmit", (event) => addDevice(event).catch((error) => toast(error.message, "error")));
+    bind("#cancelDevice", "onclick", () => $("#deviceDialog").close());
+    bind("#closeDeviceReady", "onclick", () => $("#deviceReadyDialog").close());
+    bind("#copyDeviceLogin", "onclick", () => navigator.clipboard?.writeText(`Device code: ${$("#readyDeviceCode").textContent}\nDevice secret: ${$("#readyDeviceSecret").textContent}`).then(() => toast("Device code and secret copied.", "success")));
+    bind("#importFile", "onchange", () => { const file = $("#importFile").files?.[0]; $("#importFileStatus").textContent = file ? `${file.name} selected. Preview before processing.` : "No file selected."; });
+    bind("#previewImport", "onclick", () => previewImport().catch((error) => toast(error.message, "error")));
+    bind("#confirmImport", "onclick", () => confirmImport().catch((error) => toast(error.message, "error")));
+    bind("#refreshImports", "onclick", () => loadImports().catch((error) => toast(error.message, "error")));
+    bind("#runReport", "onclick", () => runReport().catch((error) => toast(error.message, "error")));
+    bind("#loadStaffAnalysis", "onclick", () => loadStaffAnalysis().catch((error) => toast(error.message, "error")));
+    bind("#loadStaffHistory", "onclick", () => loadStaffHistory().catch((error) => toast(error.message, "error")));
+    bind("#refreshStaffLogbook", "onclick", () => loadStaffAnalysis().catch((error) => toast(error.message, "error")));
+    bind("#printReport", "onclick", () => printArea("print-report"));
+    bind("#printStaffLogbook", "onclick", () => printStaffLogbook().catch((error) => toast(error.message, "error")));
+    bind("#closeQr", "onclick", () => $("#qrDialog").close());
+    bind("#closeQrButton", "onclick", () => $("#qrDialog").close());
+    bind("#downloadQrPng", "onclick", downloadQrPng);
+    bind("#printQrDialog", "onclick", () => printQrBatch().catch((error) => toast(error.message, "error")));
+    bind("#printQrBackCovers", "onclick", () => printQrBackCovers().catch((error) => toast(error.message, "error")));
+    if ($("#reportFrom")) $("#reportFrom").value = monthStart();
+    if ($("#reportTo")) $("#reportTo").value = todayIso();
+    if ($("#staffLogbookDate")) $("#staffLogbookDate").value = todayIso();
+    if ($("#staffHistoryFrom")) $("#staffHistoryFrom").value = monthStart();
+    if ($("#staffHistoryTo")) $("#staffHistoryTo").value = todayIso();
   }
 
   async function loadContext() {
